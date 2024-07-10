@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+
     xmlns:tools="http://schemas.android.com/tools"
     package="com.jaljeevanmission.jaljeevanmissiondynamic">
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -7,7 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <application
-        android:label="Jal Jeevan Mission"
+        android:label="Field User Mobile App"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

@@ -29,22 +29,22 @@ class Myresponse {
     if (json['Result'] != null) {
       result = <Result>[];
       json['Result'].forEach((v) {
-        result!.add(new Result.fromJson(v));
+        result!.add(Result.fromJson(v));
       });
     }
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['Status'] = this.status;
-    data['Message'] = this.message;
-    data['UserName'] = this.userName;
-    data['UserDescription'] = this.userDescription;
-    data['UserId'] = this.UserId;
-    data['Mobile'] = this.Mobile;
-    data['Designation'] = this.Designation;
-    if (this.result != null) {
-      data['Result'] = this.result!.map((v) => v.toJson()).toList();
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['Status'] = status;
+    data['Message'] = message;
+    data['UserName'] = userName;
+    data['UserDescription'] = userDescription;
+    data['UserId'] = UserId;
+    data['Mobile'] = Mobile;
+    data['Designation'] = Designation;
+    if (result != null) {
+      data['Result'] = result!.map((v) => v.toJson()).toList();
     }
     return data;
   }
@@ -63,18 +63,18 @@ class Result {
     if (json['SubHeadingmenulist'] != null) {
       subHeadingmenulist = <SubHeadingmenulist>[];
       json['SubHeadingmenulist'].forEach((v) {
-        subHeadingmenulist!.add(new SubHeadingmenulist.fromJson(v));
+        subHeadingmenulist!.add(SubHeadingmenulist.fromJson(v));
       });
     }
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['MenuId'] = this.menuId;
-    data['Heading'] = this.heading;
-    if (this.subHeadingmenulist != null) {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['MenuId'] = menuId;
+    data['Heading'] = heading;
+    if (subHeadingmenulist != null) {
       data['SubHeadingmenulist'] =
-          this.subHeadingmenulist!.map((v) => v.toJson()).toList();
+          subHeadingmenulist!.map((v) => v.toJson()).toList();
     }
     return data;
   }
@@ -99,18 +99,18 @@ class SubHeadingmenulist {
     if (json['Result'] != null) {
       result = <SubResult>[];
       json['Result'].forEach((v) {
-        result!.add(new SubResult.fromJson(v));
+        result!.add(SubResult.fromJson(v));
       });
     }
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['SubHeadingMenuId'] = this.subHeadingMenuId;
-    data['SubHeading'] = this.subHeading;
-    data['SubHeadingParentId'] = this.subHeadingParentId;
-    if (this.result != null) {
-      data['Result'] = this.result!.map((v) => v.toJson()).toList();
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['SubHeadingMenuId'] = subHeadingMenuId;
+    data['SubHeading'] = subHeading;
+    data['SubHeadingParentId'] = subHeadingParentId;
+    if (result != null) {
+      data['Result'] = result!.map((v) => v.toJson()).toList();
     }
     return data;
   }
@@ -132,11 +132,11 @@ class SubResult {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['lableMenuId'] = this.lableMenuId;
-    data['LableText'] = this.lableText;
-    data['LableValue'] = this.lableValue;
-    data['Icon'] = this.icon;
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['lableMenuId'] = lableMenuId;
+    data['LableText'] = lableText;
+    data['LableValue'] = lableValue;
+    data['Icon'] = icon;
     return data;
   }
 }

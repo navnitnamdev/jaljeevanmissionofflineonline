@@ -2,7 +2,6 @@
 //
 //     final ssGeotagmodal = ssGeotagmodalFromJson(jsonString);
 
-import 'package:meta/meta.dart';
 import 'dart:convert';
 
 SsGeotagmodal ssGeotagmodalFromJson(String str) => SsGeotagmodal.fromJson(json.decode(str));
@@ -51,7 +50,7 @@ class SsGeotagmodal {
 
 class Result {
   int taggedId;
-  String schemeName;
+  String? schemeName;
   String imageUrl;
   int stateId;
   int villageId;

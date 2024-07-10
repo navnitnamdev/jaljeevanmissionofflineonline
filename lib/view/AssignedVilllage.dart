@@ -10,14 +10,14 @@ import 'package:jaljeevanmissiondynamic/view/VillageDetails.dart';
 import 'LoginScreen.dart';
 
 class AssignedVillage extends StatefulWidget {
-  var dbuserid;
-  var userid;
+
+
   var usertoken;
   var stateid;
 
   AssignedVillage(
-      {required this.dbuserid,
-      required this.userid,
+      {
+
       required this.usertoken,
       required this.stateid,
       Key? key})
@@ -31,13 +31,21 @@ class _AssignedVillageState extends State<AssignedVillage> {
   List<dynamic> ListResponse = [];
   GetStorage box = GetStorage();
 
+
+
+
   late Future<List<Villagelistlocaldata>> villagelistlocal;
 
   List _newList = [];
+
   List list = [];
   DatabaseHelperJalJeevan? databaseHelperJalJeevan;
   var VillageId;
   var VillageName;
+  bool checkedValue=false;
+  String checkedboxvalueselet="";
+  List<bool> isCheckedList=[];
+
 
   void _runFilter(String enterkeyword) {
     List searchresult = [];
@@ -67,57 +75,59 @@ class _AssignedVillageState extends State<AssignedVillage> {
   void initState() {
     super.initState();
 
+
+
     if(box.read("UserToken").toString() == "null") {
-      Get.off(LoginScreen());
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("Please login your token has been expired!")));
+      Get.offAll(const LoginScreen());
+      box.remove("UserToken").toString();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Please login, your token has been expired!")));
     }
 
     databaseHelperJalJeevan = DatabaseHelperJalJeevan();
 
-    /* Apiservice.fetchData(
-        context, widget.userid, widget.stateid, "194431", widget.usertoken);*/
-
-    Apiservice.getvillagelistapi(
-            widget.userid, widget.stateid, widget.usertoken)
+     Apiservice.getvillagelistapi(box.read("userid"), widget.stateid, widget.usertoken)
         .then((value) {
-      try {
-        ListResponse = value["Villagelist_Datas"];
-      } catch (e) {
-      }
-      ListResponse = value["Villagelist_Datas"];
-      setState(() {
-        _newList = ListResponse;
 
-        if (widget.userid != widget.dbuserid) {
-          for (int i = 0; i < _newList.length; i++) {
-            try {
-              databaseHelperJalJeevan?.insert_villagelist(Villagelistlocaldata(
-                villageId: _newList[i]["VillageId"].toString(),
-                villageName: _newList[i]["VillageName"].toString(),
-              ));
-            } catch (e) {}
-          }
-        } else {}
-      });
+
+     if (value["Status"].toString() == "false") {
+          print("ddddd${value["Status"]}");
+         setState(() {
+           Get.offAll(const LoginScreen());
+           box.remove("UserToken").toString();
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+               content: Text(value["Message"].toString())));
+         });
+
+        }else{
+          setState(() {
+            ListResponse = value["Villagelist_Datas"];
+            _newList = ListResponse;
+            isCheckedList = List.generate(_newList.length, (index) => false);
+
+          });
+        }
+
+
+
     });
-    loaddata();
-  }
 
-  loaddata() async {
-    villagelistlocal = databaseHelperJalJeevan!.fatchvillagelist();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return
+      Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D3A98),
         iconTheme: const IconThemeData(
           color: Appcolor.white,
         ),
         title: const Text("Assigned Village",
-            style: TextStyle(color: Colors.white)),
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
               icon: const Icon(
@@ -126,13 +136,7 @@ class _AssignedVillageState extends State<AssignedVillage> {
                 size: 30,
               ),
               onPressed: () async {
-                /*  databaseHelperJalJeevan?.insert_villagelist(VillagelistDatas(villageId: 3, villageName: "asnawar"))
-                      .then((value) {
-                    print("data added in sqflite");
 
-                  }).onError((error, stackTrace) {
-                    print(error.toString());
-                  });*/
               })
         ],
       ),
@@ -140,7 +144,8 @@ class _AssignedVillageState extends State<AssignedVillage> {
         onTap: () {
           FocusScope.of(context).requestFocus(FocusNode());
         },
-        child: Container(
+        child:
+        Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
           decoration: const BoxDecoration(
@@ -149,7 +154,7 @@ class _AssignedVillageState extends State<AssignedVillage> {
           ),
           child: FutureBuilder(
             future: Apiservice.getvillagelistapi(
-                widget.userid, widget.stateid, widget.usertoken),
+                box.read("userid"), widget.stateid, widget.usertoken),
             //future: villagelistlocal,
             builder: (context, snapshot) {
               if (snapshot.hasData) {
@@ -212,7 +217,8 @@ class _AssignedVillageState extends State<AssignedVillage> {
                                                 onPressed: () {
                                                   box.remove("UserToken");
                                                   box.remove('loginBool');
-                                                  Get.off(LoginScreen());
+                                                  Get.off(const LoginScreen());
+                                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Logged out successfully")));
                                                 },
                                                 child: const Text('Sign Out'))
                                           ],
@@ -222,8 +228,7 @@ class _AssignedVillageState extends State<AssignedVillage> {
                               },
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(20.0),
-                                child: Image.asset('images/profile.png',
-                                    width: 50.0, height: 50.0),
+                                child: const Icon(Icons.logout , size: 40, color: Appcolor.btncolor,),
                               ),
                             ),
                           ],
@@ -311,114 +316,112 @@ class _AssignedVillageState extends State<AssignedVillage> {
                                   color: Appcolor.lightgrey,
                                 ),
                                 Container(
-                                    child: _newList.isEmpty
-                                        ? const Center(
-                                            child: SizedBox(
-width: 40,
-                                                height: 40,
-                                                child: CircularProgressIndicator()),
-                                          )
-                                        : ListView.builder(
+                                    child: _newList.isNotEmpty
+                                        ?
+                                    ListView.builder(
                                             itemCount: _newList.length,
                                             //  itemCount: snapshot.data!.length,
                                             shrinkWrap: true,
                                             physics:
                                                 const NeverScrollableScrollPhysics(),
                                             itemBuilder: (context, int index) {
-                                              // _newList = ListResponse.toList();
-                                              //      print("nena -"+snapshot.data![index]["VillageName"].toString());
-                                              //print("villagelisting"  + _newList.length.toString());
+                                              return
+                                                Container(
+                                                    height: 50,
+                                                    padding:
+                                                    const EdgeInsets.all(2),
+                                                    child: Material(
+                                                      elevation: 2.0,
+                                                      borderRadius:
+                                                      BorderRadius.circular(
+                                                          10.0),
+                                                      child: InkWell(
+                                                        splashColor:
+                                                        Appcolor.splashcolor,
+                                                        customBorder:
+                                                        RoundedRectangleBorder(
+                                                          borderRadius:
+                                                          BorderRadius
+                                                              .circular(10.0),
+                                                        ),
+                                                        onTap: () {
+                                                          Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                                builder: (context) =>
+                                                                    VillageDetails(token: box.read('UserToken'),
+                                                                      userID: box.read('userid'),
+                                                                      villageid: _newList[index]
+                                                                      [
+                                                                      "VillageId"]
+                                                                          .toString(),
+                                                                      villagename:
+                                                                      _newList[index]["VillageName"]
+                                                                          .toString(),
+                                                                      stateid: widget
+                                                                          .stateid,
+                                                                    )),
+                                                          );
+                                                          
+                                                    print("villageid_${_newList[index]["VillageId"]}");
+                                                        },
+                                                        child:
+                                                        Row(
+                                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                          children: [
 
-                                              return Container(
-                                                  height: 50,
-                                                  padding:
-                                                      const EdgeInsets.all(2),
-                                                  child: Material(
-                                                    elevation: 2.0,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            10.0),
-                                                    child: InkWell(
-                                                      splashColor:
-                                                          Appcolor.splashcolor,
-                                                      customBorder:
-                                                          RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(10.0),
-                                                      ),
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                          context,
-                                                          MaterialPageRoute(
-                                                              builder: (context) =>
-                                                                  VillageDetails(
-                                                                    villageid: _newList[index]
-                                                                            [
-                                                                            "VillageId"]
-                                                                        .toString(),
-                                                                    villagename:
-                                                                        _newList[index]["VillageName"]
-                                                                            .toString(),
-                                                                    stateid: widget
-                                                                        .stateid,
-                                                                  )),
-                                                        );
-                                                        print("villageid_" +
-                                                            _newList[index][
-                                                                    "VillageId"]
-                                                                .toString());
-                                                      },
-                                                      child: Row(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .spaceBetween,
-                                                        children: [
-                                                          Padding(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .all(5.0),
-                                                            child: Text(
-                                                              _newList[index][
-                                                                      "VillageName"]
-                                                                  .toString(),
-                                                              // snapshot.data![index].villageName.toString(),
+                                                           Container(
+                                                             child: Padding(
+                                                               padding:
+                                                               const EdgeInsets
+                                                                   .all(5.0),
+                                                               child: Text(
+                                                                 _newList[index][
+                                                                 "VillageName"]
+                                                                     .toString(),
+                                                                 style: const TextStyle(
+                                                                     fontWeight:
+                                                                     FontWeight
+                                                                         .w500,
+                                                                     fontSize: 15),
+                                                               ),
+                                                             ),
+                                                           ),
 
-                                                              style: const TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500,
-                                                                  fontSize: 15),
+                                                            IconButton(
+                                                              color: Colors.black,
+                                                              onPressed: () {
+                                                                Navigator.push(
+                                                                  context,
+                                                                  MaterialPageRoute(
+                                                                      builder: (context) => VillageDetails(
+                                                                        token: box.read("UserToken"),
+                                                                          userID: box.read("userid"),
+                                                                          villageid:
+                                                                          _newList[index]["VillageId"]
+                                                                              .toString(),
+                                                                          villagename:
+                                                                          _newList[index]["VillageName"]
+                                                                              .toString(),
+                                                                          stateid:
+                                                                          widget.stateid)),
+                                                                );
+                                                              },
+                                                              icon: const Icon(
+                                                                Icons
+                                                                    .double_arrow_outlined,
+                                                                size: 20,
+                                                              ),
                                                             ),
-                                                          ),
-                                                          IconButton(
-                                                            color: Colors.black,
-                                                            onPressed: () {
-                                                              Navigator.push(
-                                                                context,
-                                                                MaterialPageRoute(
-                                                                    builder: (context) => VillageDetails(
-                                                                        villageid:
-                                                                            _newList[index]["VillageId"]
-                                                                                .toString(),
-                                                                        villagename:
-                                                                            _newList[index]["VillageName"]
-                                                                                .toString(),
-                                                                        stateid:
-                                                                            widget.stateid)),
-                                                              );
-                                                            },
-                                                            icon: const Icon(
-                                                              Icons
-                                                                  .double_arrow_outlined,
-                                                              size: 20,
-                                                            ),
-                                                          ),
-                                                        ],
+                                                          ],
+                                                        ),
                                                       ),
-                                                    ),
-                                                  ));
-                                            }))
+                                                    )
+                                                );
+                                            }): const CircularProgressIndicator())
+
+
+
                               ],
                             ),
                           ),
@@ -432,7 +435,7 @@ width: 40,
                   child: SizedBox(
                       height: 40,
                       width: 40,
-                      child: Image.asset("images/loading.gif")),
+                      child: CircularProgressIndicator()),
                 );
               } else {
                 return Center(

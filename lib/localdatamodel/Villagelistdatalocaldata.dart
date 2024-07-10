@@ -1,31 +1,20 @@
-class Villagelistlocaldata{
-
-
-  final int? id;
+class Villagelistlocaldata {
   final String? villageId;
   final String? villageName;
 
+  Villagelistlocaldata({required this.villageId, required this.villageName});
 
-  Villagelistlocaldata({ this.id ,required this.villageId,required this.villageName });
+  Villagelistlocaldata.fromMap(Map<String, dynamic> res)
+      : villageId = res['VillageId'],
+        villageName = res['VillageName'];
 
-  Villagelistlocaldata.fromMap(Map<String , dynamic> res):
-        id = res['id'],
-        villageId = res['villageId'],
-        villageName = res['villageName'];
 
-  Map<String , Object?> toMap(){
 
+
+  Map<String, Object?> toMap() {
     return {
-
-      'id':id,
-      'villageId':villageId,
-      'villageName':villageName,
-
-
+      'VillageId': villageId,
+      'VillageName': villageName,
     };
   }
-
-
-
-
 }

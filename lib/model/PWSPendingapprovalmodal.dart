@@ -2,7 +2,6 @@
 //
 //     final pwsPendingapprovalmodal = pwsPendingapprovalmodalFromJson(jsonString);
 
-import 'package:meta/meta.dart';
 import 'dart:convert';
 
 PwsPendingapprovalmodal pwsPendingapprovalmodalFromJson(String str) => PwsPendingapprovalmodal.fromJson(json.decode(str));

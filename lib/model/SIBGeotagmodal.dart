@@ -2,7 +2,6 @@
 //
 //     final sibGeotagmodal = sibGeotagmodalFromJson(jsonString);
 
-import 'package:meta/meta.dart';
 import 'dart:convert';
 
 SibGeotagmodal sibGeotagmodalFromJson(String str) => SibGeotagmodal.fromJson(json.decode(str));
@@ -10,13 +9,13 @@ SibGeotagmodal sibGeotagmodalFromJson(String str) => SibGeotagmodal.fromJson(jso
 String sibGeotagmodalToJson(SibGeotagmodal data) => json.encode(data.toJson());
 
 class SibGeotagmodal {
-  bool status;
-  String message;
-  String district;
-  String block;
-  String panchayat;
-  String headingMessage;
-  List<Result> result;
+  final bool status;
+  final String message;
+  final String district;
+  final String block;
+  final String panchayat;
+  final String headingMessage;
+  final List<Result> result;
 
   SibGeotagmodal({
     required this.status,
@@ -30,11 +29,11 @@ class SibGeotagmodal {
 
   factory SibGeotagmodal.fromJson(Map<String, dynamic> json) => SibGeotagmodal(
     status: json["Status"],
-    message: json["Message"],
-    district: json["District"],
-    block: json["Block"],
-    panchayat: json["Panchayat"],
-    headingMessage: json["HeadingMessage"],
+    message: json["Message"].toString(),
+    district: json["District"].toString(),
+    block: json["Block"].toString(),
+    panchayat: json["Panchayat"].toString(),
+    headingMessage: json["HeadingMessage"].toString(),
     result: List<Result>.from(json["Result"].map((x) => Result.fromJson(x))),
   );
 
@@ -47,32 +46,33 @@ class SibGeotagmodal {
     "HeadingMessage": headingMessage,
     "Result": List<dynamic>.from(result.map((x) => x.toJson())),
   };
+
 }
 
 class Result {
-  int taggedId;
-  String schemeName;
-  String imageUrl;
-  int stateId;
-  int villageId;
-  String districtName;
-  String blockName;
-  String panchayatName;
-  String villageName;
-  String sourceName;
-  dynamic sourceCatogery;
-  dynamic sourcetype;
-  String latitude;
-  String longitude;
-  int photoStatus;
-  int capicityInltr;
-  dynamic storageStructureType;
-  dynamic otherCategory;
-  String habitationName;
-  int isApprovedDivisionBy;
-  int isApprovedStateBy;
-  int status;
-  String message;
+  final int taggedId;
+  final String schemeName;
+  final String imageUrl;
+  final int stateId;
+  final int villageId;
+  final String districtName;
+  final String blockName;
+  final String panchayatName;
+  final String villageName;
+  final String sourceName;
+  final dynamic sourceCatogery;
+  final dynamic sourcetype;
+  final String latitude;
+  final String longitude;
+  final int photoStatus;
+  final int capicityInltr;
+  final dynamic storageStructureType;
+  final dynamic otherCategory;
+  final String habitationName;
+  final int isApprovedDivisionBy;
+  final int isApprovedStateBy;
+  final int status;
+  final String message;
 
   Result({
     required this.taggedId,

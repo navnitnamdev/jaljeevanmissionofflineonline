@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:jaljeevanmissiondynamic/utility/Appcolor.dart';
 
 class Utilityclass{
@@ -9,11 +8,11 @@ class Utilityclass{
       barrierDismissible: true,
       builder: (BuildContext context) {
         return AlertDialog(
-          contentPadding: EdgeInsets.symmetric(horizontal: 5),
-          title: Container(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 5),
+          title: SizedBox(
               width: MediaQuery.of(context).size.width,
               height: 40,
-              child: Text(
+              child: const Text(
                 '⚠ No Internet Connection',
                 style: TextStyle(
                     fontSize: 18,
@@ -21,12 +20,12 @@ class Utilityclass{
                     color: Colors.black,
                     fontWeight: FontWeight.bold),
               )),
-          content: SingleChildScrollView(
+          content: const SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
                 Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(10.0),
+                      padding: EdgeInsets.all(10.0),
                       child: Text(
                           'You need to have mobile data or wifi to access this. '),
                     )),
@@ -40,7 +39,7 @@ class Utilityclass{
                     backgroundColor: Appcolor.COLOR_PRIMARY,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(5))),
-                child: Container(
+                child: const SizedBox(
 
                     width: 100,
                     child: Center(child: Text('Close'))),

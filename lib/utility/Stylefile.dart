@@ -41,12 +41,76 @@ class Stylefile {
       content: Text(message),
     ));
   }
+/*
+  static void showmessageforvalidationtrue(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),backgroundColor: Appcolor.greenmessagecolor,
+    ));
+  }*/
+
+  static void showmessageforvalidationtrue(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+
+      content: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.keyboard_double_arrow_down_outlined,
+            color: Colors.white,
+          ),
+        ],
+      ),
+      backgroundColor: Appcolor.greenmessagecolor,
+    ));
+  }
+
+  static void showmessageforvalidationfalse(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.keyboard_double_arrow_down_outlined,
+            color: Colors.white,
+          ),
+        ],
+      ),
+      backgroundColor: Appcolor.red,
+    ));
+  }
+
+  static void hideKeyboard(BuildContext context) {
+    FocusScope.of(context).requestFocus(FocusNode());
+  }
+
+/*  static void showmessageforvalidationfalse(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),backgroundColor: Appcolor.red,
+    ));
+  }*/
   static void showmessageapisuccess(
       BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),backgroundColor: Appcolor.greenmessagecolor,
     ));
   }
+
 
   static void showmessageapierrors(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -59,16 +123,16 @@ class Stylefile {
     color: Appcolor.grey,
   );
   static ButtonStyle elevatedbuttonStyle = ElevatedButton.styleFrom(
-    onPrimary: Appcolor.white,
-    primary: Appcolor.btncolor,
-    textStyle: TextStyle( fontWeight: FontWeight.bold, fontSize: 14),
+    foregroundColor: Appcolor.white, backgroundColor: Appcolor.btncolor,
+    textStyle: const TextStyle( fontWeight: FontWeight.bold, fontSize: 14),
     elevation: 5,
-    minimumSize: Size(230, 40),
+    /*minimumSize:  Size(230, 40),
+    maximumSize:  Size(230,40),*/
 
-    padding: EdgeInsets.symmetric(horizontal: 5),
+    padding: const EdgeInsets.symmetric(horizontal: 5),
     shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10.0),
-        side: BorderSide(width: 1, color: Appcolor.btnbordercolor)),
+        side: const BorderSide(width: 1, color: Appcolor.btncolor)),
   );
 
   static _showToast(BuildContext context) {
@@ -80,4 +144,18 @@ class Stylefile {
       ),
     );
   }
+
+
+  static const TextStyle submainheadingstyle = TextStyle(
+    // fontFamily: "Poppins",
+    color: Appcolor.black,
+    fontSize: 11
+  );
+  static const TextStyle mainheadingstyle = TextStyle(
+    // fontFamily: "Poppins",
+      color: Colors.black,
+      fontSize: 18,
+      fontWeight:
+      FontWeight.bold
+  );
 }

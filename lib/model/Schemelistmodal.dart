@@ -2,7 +2,6 @@
 //
 //     final schemelistmodal = schemelistmodalFromJson(jsonString);
 
-import 'package:meta/meta.dart';
 import 'dart:convert';
 
 Schemelistmodal schemelistmodalFromJson(String str) => Schemelistmodal.fromJson(json.decode(str));

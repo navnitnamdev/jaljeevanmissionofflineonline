@@ -2,7 +2,6 @@
 //
 //     final oaGeotagmodal = oaGeotagmodalFromJson(jsonString);
 
-import 'package:meta/meta.dart';
 import 'dart:convert';
 
 OaGeotagmodal oaGeotagmodalFromJson(String str) => OaGeotagmodal.fromJson(json.decode(str));
@@ -51,7 +50,7 @@ class OaGeotagmodal {
 
 class Result {
   int taggedId;
-  String schemeName;
+  dynamic schemeName;
   String imageUrl;
   int stateId;
   int villageId;

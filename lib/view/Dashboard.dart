@@ -1,29 +1,46 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
+import 'package:jaljeevanmissiondynamic/model/GetSourceCategoryModal.dart';
+import 'package:jaljeevanmissiondynamic/utility/Stylefile.dart';
+import 'package:jaljeevanmissiondynamic/utility/Textfile.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:focus_detector/focus_detector.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:jaljeevanmissiondynamic/apiservice/Apiservice.dart';
 import 'package:jaljeevanmissiondynamic/database/DataBaseHelperJalJeevan.dart';
-import 'package:jaljeevanmissiondynamic/localdatamodel/DashboardLocalModal.dart';
-import 'package:jaljeevanmissiondynamic/localdatamodel/Userdata.dart';
+import 'package:jaljeevanmissiondynamic/localdatamodel/Localmasterdatamodal.dart';
 import 'package:jaljeevanmissiondynamic/model/Myresponse.dart';
 import 'package:jaljeevanmissiondynamic/model/Schememodal.dart';
-import 'package:jaljeevanmissiondynamic/practisedb/DBPractice.dart';
 import 'package:jaljeevanmissiondynamic/utility/Appcolor.dart';
-import 'package:jaljeevanmissiondynamic/utility/InternetNotAvailable.dart';
 import 'package:jaljeevanmissiondynamic/utility/SyncronizationData.dart';
-import 'package:jaljeevanmissiondynamic/utility/Utilityclass.dart';
-import 'package:jaljeevanmissiondynamic/view/AssignedVilllage.dart';
 import 'package:jaljeevanmissiondynamic/view/LoginScreen.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+import '../Selectedvillagelist.dart';
+import '../addfhtc/FHTCAssignedVillage.dart';
+import '../localdatamodel/LocalSIBsavemodal.dart';
+import '../localdatamodel/Localpwssourcemodal.dart';
+import '../localdatamodel/Localsaveofflinevillages.dart';
+import '../model/LocalOtherassetsofflinesavemodal.dart';
+import '../model/LocalStoragestructureofflinesavemodal.dart';
+import '../model/MyClass.dart';
+import '../model/Saveoffinevillagemodal.dart';
+import '../model/Savesourcetypemodal.dart';
+import '../model/Savevillagedetails.dart';
+import '../model/Villagelistforsend.dart';
+import '../model/Villagelistmodal.dart';
+import 'Commonallofflineentries.dart';
+
+import 'Villagelistzero.dart';
 
 class Dashboard extends StatefulWidget {
   String stateid;
@@ -38,7 +55,8 @@ class Dashboard extends StatefulWidget {
       : super(key: key);
 
   @override
-  State<Dashboard> createState() => _DashboardState();
+  State<Dashboard> createState() =>
+      _DashboardState(stateId: stateid, userid: userid, usertoken: usertoken);
 }
 
 class _DashboardState extends State<Dashboard> {
@@ -51,7 +69,8 @@ class _DashboardState extends State<Dashboard> {
   var stateName = "0";
   String? districtName = "";
   var divisionName = '';
-  int? stateId;
+  var stateId = "";
+  String? usertoken;
   int? districtId;
   int totalAssignVillage = 0;
   int totalPwsSchemes = 0;
@@ -146,17 +165,19 @@ class _DashboardState extends State<Dashboard> {
   var otherassetstext = "";
   var otherassetstextvalue = "";
   var otherassetstexticon = "";
-  var usernameofusername = "";
+  int totalallrecordoffline = 0;
+  bool totalallrecordofflineupload = false;
   var Mobile = "";
   var Designation = "";
   var leftmenuheadingmenuid;
   var userid;
+  final List _newList = [];
   late Myresponse? myresponse;
-
+  bool uploadserverbtn = false;
+  bool Addgeotagbuttonvisible = true;
+  bool visibleclose = true;
   bool hasinternetconnection = false;
   DatabaseHelperJalJeevan? databaseHelperJalJeevan;
-  late Future<List<Userdata>> userdatalist;
-  late Future<List<DashboardLocalModal>> dbhelpee;
   var dbleftheadingmenuid;
   var dbleftheadingmain;
   var dbleftsubheadingmenuid;
@@ -164,6 +185,20 @@ class _DashboardState extends State<Dashboard> {
   var dbleftsubheadingmenu;
   var dbleftheadinglable;
   var dbleftheadingvalue;
+  String villageid = "";
+  bool uploadFunctionCalled = false;
+  bool isFABVisible = true;
+  bool upload_loader = false;
+  Offset fabPosition = const Offset(1, 600);
+
+  void toggleFABVisibility() {
+    setState(() {
+      isFABVisible = !isFABVisible;
+    });
+  }
+
+  _DashboardState(
+      {required this.stateId, required this.userid, required this.usertoken});
 
   static CacheManager customCacheManager = CacheManager(
     Config(
@@ -183,131 +218,694 @@ class _DashboardState extends State<Dashboard> {
   late Schememodal schememodal;
   String? _currentAddress;
   Position? _currentPosition;
+  List<dynamic> ListResponse = [];
+  String newschameid = "";
+  String newschemename = "";
+  String messageofscheme_mvs = "";
+  String messageof_existingscheme = "";
+  String newCategory = "";
+  late Future<List<Localmasterdatanodal>> localmasterdatalist;
+  late Localmasterdatanodal localmasterdatanodal;
+  String gettotalvillage = "";
+  String OfflineStatus = "";
+  String PanchayatName = "";
+  String BlockName = "";
+  String DistrictName = "";
+  List<dynamic> Listofsourcetype = [];
+  bool isselect = false;
+  late Villagelistmodal villagelistmodal;
+  int? index;
+  late Saveoffinevillagemodal? saveoffinevillagemodal;
+  var Nolistpresent;
+  var totalsibrecord;
+  String totalotherassetsofflineentreies = "";
+  late Villagelistforsend villagelist;
+  List<Villagelistforsend> listofvill = [];
+  final List<MyClass> _selecteCategorys = [];
+  List<MyClass> selectedbox = [];
+  List listone = [];
+  List<Localsaveofflinevillages> localofflinevillagelist = [];
+  late MyClass myClass;
+  late Localsaveofflinevillages localsaveofflinevillages;
+  String searchString = "";
+  String totalpwssource = "";
+  String totalsibboard = "";
+  String assignedvillagew = "";
+  late Savevillagedetails savevillagedetails;
+  late Savesourcetypemodal savesourcetypemodal;
+  var totalvillages;
+  List<dynamic> saveoffinevillaglist = [];
+  String assignedvillage = "";
+  String pwstotalscheme = "";
+  String awsschoolschemetotal = "";
+  var workingvillage = "";
+  List offlinevillagelistlist = [];
+  String totalstoragestructureofflineentreies = "";
+  String totalstoragestructureboard = "";
+  var successfulUploadCountOT;
+  List<dynamic> mainListsourcecategory = [];
+  List<dynamic> sourcetypeidlistone = [];
+  List<dynamic> sourcetypeidlist = [];
+  List<dynamic> SourceTypeCategoryList = [];
+  List<dynamic> SourceTypeCategoryList_id = [];
+  List<dynamic> sourcetypelistone_id = [];
+  List<dynamic> minisource2 = [];
+  List<dynamic> minisource = [];
+  String SourceTypeCategoryIdget = "";
+  String sourcetypeid = "";
+  String fileNameofimg = "";
+  String sourcetype = "";
+  String sourceTypeCategoryId = "";
+  late GetSourceCategoryModal getSourceCategoryModal;
+  var distinctlist = [];
+  var distinct_categorylist = [];
+  List listResult = [];
+  bool floatingloader = false;
+  var versionapk = 5;
+
+  callfornumber() async {
+    Nolistpresent ??= 0;
+    Nolistpresent = await databaseHelperJalJeevan!.countRows();
+  }
+
+  Future<bool> requestLocationPermission() async {
+    var status = await Permission.location.request();
+
+    if (status.isGranted) {
+      return true;
+    } else if (status.isDenied) {
+      return false;
+    } else if (status.isPermanentlyDenied) {
+      openAppSettings();
+      return false;
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  void dispose() {
+    totalpwssource.isEmpty;
+    totalstoragestructureofflineentreies.isEmpty;
+    totalsibboard.isEmpty;
+    totalotherassetsofflineentreies.isEmpty;
+    super.dispose();
+  }
+
+  void checkAndRequestLocationPermission() async {
+    bool permissionGranted = await requestLocationPermission();
+    if (permissionGranted) {
+    } else {}
+  }
+
   @override
   void initState() {
     isInternet();
-
-
+    checkAndRequestLocationPermission();
     databaseHelperJalJeevan = DatabaseHelperJalJeevan();
-    fatchdatauserprofile();
     myresponse = Myresponse();
-
+    localmasterdatanodal = Localmasterdatanodal();
     schememodal = Schememodal("-- Select Scheme --", "", "");
-    print("usertoken> " + " " + widget.usertoken);
-    print("userid> " + " " + widget.userid);
-    print("stateid> " + " " + widget.stateid);
+    savesourcetypemodal = Savesourcetypemodal();
 
-    doSomeAsyncStuff();
+    print("usertoken-> ${box.read("UserToken")}");
+    print("stateid${box.read("stateid")}");
+    print("userid${box.read("userid")}");
 
     setState(() {
-      /*Apiservice.fetchData(context , box.read("UserToken")).then((value) {
-   });*/
-/* Apiservice.schemelistapi(context , box.read("UserToken")).then((value) {
-        print(value);
-      });*/
-
-
+      doSomeAsyncStuff();
     });
+    loaddata();
+
+    Apicallforvilages();
+    getload();
+    callfornumber();
+    setState(() {
+      getallpwssaveoffline();
+      getallsibsaveoffline();
+      getallotherassetssaveoffline();
+      getallstoragestructuresaveoffline();
+    });
+
+    setState(() {
+      totalvillages = int.parse(box.read("TotalOfflineVillage") ?? '0');
+    });
+    fetchDateandtimefromtable(box.read("userid").toString());
+
     super.initState();
+  }
+
+  void fetchDateandtimefromtable(String userId) async {
+    List<Map<String, dynamic>> data =
+        await databaseHelperJalJeevan!.getDatatime(userId);
+  }
+
+  Future<void> getallpwssaveoffline() async {
+    final List<LocalPWSSavedData>? localDataList =
+        await databaseHelperJalJeevan?.getAllLocalPWSSavedData();
+
+    totalpwssource = localDataList!.length.toString();
+  }
+
+  Future<void> getallstoragestructuresaveoffline() async {
+    final List<LocalStoragestructureofflinesavemodal>? localDataList =
+        await databaseHelperJalJeevan
+            ?.getallofflineentriesforstoragestructure();
+    setState(() {
+      totalstoragestructureofflineentreies = localDataList!.length.toString();
+    });
+  }
+
+  Future<void> getallsibsaveoffline() async {
+    final List<LocalSIBsavemodal>? localDataList =
+        await databaseHelperJalJeevan?.getallofflineentriessib();
+    setState(() {
+      totalsibboard = localDataList!.length.toString();
+    });
+  }
+
+  Future<void> getallotherassetssaveoffline() async {
+    final List<LocalOtherassetsofflinesavemodal>? localDataList =
+        await databaseHelperJalJeevan?.getallofflineentriesforotherassets();
+    setState(() {
+      totalotherassetsofflineentreies = localDataList!.length.toString();
+    });
+  }
+
+  getload() async {
+    saveoffinevillaglist =
+        await databaseHelperJalJeevan!.fetchData_fromdb_saveofflinevilage();
+    setState(() {
+      for (int i = 0; i < saveoffinevillaglist.length; i++) {
+        offlinevillagelistlist = saveoffinevillaglist[i]!["Villagelist"];
+      }
+    });
+  }
+
+  countdatain_sibtable() async {
+    totalsibrecord ??= 0;
+
+    totalsibrecord = await databaseHelperJalJeevan!.countRows_forsib();
+  }
+
+  Future<void> cleartable_localmasterschemelisttable() async {
+    await databaseHelperJalJeevan?.truncateTable_localmasterschemelist();
+    await databaseHelperJalJeevan?.cleardb_localmasterschemelist();
+    await databaseHelperJalJeevan?.cleardb_sourcetypecategorytable();
+    await databaseHelperJalJeevan?.cleardb_sourcassettypetable();
+    await databaseHelperJalJeevan?.cleartable_villagelist();
+    await databaseHelperJalJeevan?.cleartable_villagedetails();
+    await databaseHelperJalJeevan?.cleardb_localhabitaionlisttable();
+    await databaseHelperJalJeevan?.cleardb_sourcedetailstable();
+    await databaseHelperJalJeevan?.truncatetable_dashboardtable();
+    await databaseHelperJalJeevan?.truncatetable_sibmasterdeatils();
+  }
+
+  Future<void> cleartable_ofmastersourceandcategory() async {
+    await databaseHelperJalJeevan!.cleardb_sourcetypecategorytable();
+    await databaseHelperJalJeevan!.cleardb_sourcassettypetable();
+  }
+
+  Future<void> cleartable_localmastertables() async {
+    await databaseHelperJalJeevan?.truncateTable_localmasterschemelist();
+    await databaseHelperJalJeevan?.cleardb_localmasterschemelist();
+    await databaseHelperJalJeevan?.cleartable_villagelist();
+    await databaseHelperJalJeevan?.cleartable_villagedetails();
+    await databaseHelperJalJeevan?.cleardb_localhabitaionlisttable();
+    await databaseHelperJalJeevan?.cleardb_sourcedetailstable();
+    await databaseHelperJalJeevan?.cleardb_sibmasterlist();
+  }
+
+  Apicallforvilages() async {
+    try {
+      final result = await InternetAddress.lookup('example.com');
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        getvillagelist();
+        FocusScope.of(context).unfocus();
+      }
+    } on SocketException catch (_) {}
+  }
+
+  Future getvillagedetailsApi(BuildContext context, String villageid,
+      String stateid, String userid, String token) async {
+    try {
+      var response = await http.get(
+        Uri.parse(
+            "${Apiservice.baseurl}JJM_Mobile/GetVillageGeoTaggingDetails?VillageId=$villageid&StateId=$stateid&UserId=$userid"),
+        headers: {
+          'Content-Type': 'application/json',
+          'APIKey': token ?? 'DEFAULT_API_KEY'
+        },
+      );
+      if (response.statusCode == 200) {
+        var mapResponse = jsonDecode(response.body);
+        return mapResponse;
+      } else {
+        var mapResponse = jsonDecode(response.body);
+        var status = mapResponse["Status"];
+        if (status == "false") {
+          Get.offAll(const LoginScreen());
+          box.remove("UserToken");
+          return jsonDecode(response.body);
+        }
+        setState(() {
+          insertvillagedetails(mapResponse.toString());
+        });
+
+        return mapResponse;
+      }
+    } catch (e) {}
+  }
+
+  insertvillagedetails(savevillagedetails) async {
+    await databaseHelperJalJeevan
+        ?.insertData_villagedetails_inDB(savevillagedetails);
+  }
+
+  Future<void> truncateTable_duplicate_entryofdashboarDB() async {
+    await databaseHelperJalJeevan!.duplicate_entryofdashboarDB();
+  }
+
+  Future SaveOfflinevilaagesApi(
+    BuildContext context,
+    String token,
+    String UserId,
+    List Villagelist,
+    String StateId,
+  ) async {
+    showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (context) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                  height: 40,
+                  width: 40,
+                  child: CircularProgressIndicator()),
+            ],
+          );
+        });
+
+    final response = await http.post(
+      Uri.parse("${Apiservice.baseurl}JJM_Mobile/SaveOfflineVillage"),
+      headers: {'Content-Type': 'application/json', 'APIKey': token},
+      body: jsonEncode({
+        "UserId": UserId,
+        "VillageList": Villagelist,
+        "StateId": StateId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      saveoffinevillagemodal =
+          Saveoffinevillagemodal.fromJson(jsonDecode(response.body));
+
+      return jsonDecode(response.body);
+    } else {
+      return jsonDecode(response.body);
+    }
+  }
+
+  Future getvillagelist() async {
+    var url = "${Apiservice.baseurl}JJM_Mobile/GetAssignedVillages?StateId=" +
+        box.read("stateid") +
+        "&UserId=" +
+        box.read("userid");
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'APIKey': box.read("UserToken")
+      },
+    );
+
+    if (response.statusCode == 200) {
+      Map<String, dynamic> mResposne = jsonDecode(response.body);
+      message = mResposne["Message"];
+
+      if (mResposne["Message"] == "Village list") {
+        List<dynamic> data = mResposne["Villagelist_Datas"];
+        listofvill.clear();
+        for (int i = 0; i < data.length; i++) {
+          var VillageId = data[i]!["VillageId"].toString();
+          var VillageName = data[i]!["VillageName"].toString();
+          OfflineStatus = data[i]!["OfflineStatus"].toString();
+          PanchayatName = data[i]!["PanchayatName"].toString();
+          BlockName = data[i]!["BlockName"].toString();
+          DistrictName = data[i]!["DistrictName"].toString();
+          listofvill.add(Villagelistforsend(VillageName, VillageId,
+              OfflineStatus, PanchayatName, BlockName, DistrictName));
+
+          if (listofvill[i].OfflineStatus == '1') {
+            setState(() {
+              listofvill[i].isChecked = true;
+
+              _selecteCategorys.add(MyClass(listofvill[i].villageid));
+              getschemesource(context, box.read("UserToken"),
+                  listofvill[i].villageid.toString());
+            });
+          } else {
+            setState(() {
+              listofvill[i].isChecked = false;
+            });
+          }
+        }
+      } else if (mResposne["Message"] == "Record not found") {
+        cleartable_localmastertables();
+        Stylefile.showmessageforvalidationtrue(context, mResposne["Message"]);
+      } else {
+        Get.offAll(const LoginScreen());
+        box.remove("UserToken");
+      }
+      setState(() {});
+    }
+  }
+
+  Future getschemesource(
+    BuildContext context,
+    String token,
+    String villageid,
+  ) async {
+    final queryParameters = {
+      'UserId': box.read("userid").toString(),
+      'StateId': box.read("stateid"),
+      'villageid': villageid,
+    };
+
+    var uri = Uri.parse('${Apiservice.baseurl}JJM_Mobile/GetSourceScheme');
+    final newUri = uri.replace(queryParameters: queryParameters);
+    var response = await http.get(
+      newUri,
+      headers: {
+        'Content-Type': 'application/json',
+        'APIKey': token ?? 'DEFAULT_API_KEY'
+      },
+    );
+    if (response.statusCode == 200) {
+      ListResponse.add("--Select scheme --");
+      Map<String, dynamic> mResposne = jsonDecode(response.body);
+
+      List data = mResposne['schmelist'];
+
+      schemelist.clear();
+      schemelist.add(schememodal);
+      for (int i = 0; i < data.length; i++) {
+        newschameid = data[i]!["Schemeid"].toString();
+        newschemename = data[i]!["Schemename"].toString();
+        newCategory = data[i]!["Category"].toString();
+        schemelist.add(Schememodal(newschameid, newschemename, newCategory));
+      }
+      databaseHelperJalJeevan!.insertData_schemelist_inDB(
+          Schememodal(newschameid, newschemename, newCategory));
+      setState(() {});
+    }
+    return jsonDecode(response.body);
+  }
+
+  loaddata() async {
+    List<Localmasterdatanodal> records =
+        await databaseHelperJalJeevan!.Fatchdatafrommastertable();
+
+    setState(() {
+      localmasterdatalist = databaseHelperJalJeevan!.Fatchdatafrommastertable();
+    });
   }
 
   Future isInternet() async {
     await SyncronizationData.isInternet().then((connection) {
       if (connection) {
-        synchtomysql();
       } else {}
     });
   }
 
-  Future synchtomysql() async {
-    await DatabaseHelperJalJeevan().fatchvillagelist().then((value) {});
+  Future<void> truncateTable_duplicate_entryforassetsourcetypeB() async {
+    await databaseHelperJalJeevan!.duplicate_entryforassetsourcetypeB();
   }
 
-  fatchdatauserprofile() {
-    userdatalist = databaseHelperJalJeevan!.fatchuserprofile();
+  Future<void> truncateTable_duplicate_entryforsourcecategory() async {
+    await databaseHelperJalJeevan!.duplicate_entryforsourcecategory();
   }
-
-
 
   Future<void> doSomeAsyncStuff() async {
+    setState(() {
+      _loading = true;
+    });
     try {
       final result = await InternetAddress.lookup('example.com');
       if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
         getData().then((value) {
           myresponse = value;
+          if (box.read("appvaersion") == null) {
+            cleartable_localmasterschemelisttable();
+            Apiservice.Getmasterapi(context).then((value) {
+              databaseHelperJalJeevan!.insertMasterapidatetime(
+                  Localmasterdatetime(
+                      UserId: box.read("userid").toString(),
+                      API_DateTime: value.API_DateTime.toString()));
 
+              for (int i = 0; i < value.villagelist!.length; i++) {
+                var userid = value.villagelist![i]!.userId;
+
+                var villageId = value.villagelist![i]!.villageId;
+                var stateId = value.villagelist![i]!.stateId;
+                var villageName = value.villagelist![i]!.VillageName;
+
+                databaseHelperJalJeevan
+                    ?.insertMastervillagelistdata(Localmasterdatanodal(
+                        UserId: userid.toString(),
+                        villageId: villageId.toString(),
+                        StateId: stateId.toString(),
+                        villageName: villageName.toString()))
+                    .then((value) {});
+              }
+              databaseHelperJalJeevan!.removeDuplicateEntries();
+
+              for (int i = 0; i < value.villageDetails!.length; i++) {
+                var stateName = "Assam";
+
+                var districtName = value.villageDetails![i]!.districtName;
+                var stateid = value.villageDetails![i]!.stateId;
+                var blockName = value.villageDetails![i]!.blockName;
+                var panchayatName = value.villageDetails![i]!.panchayatName;
+                var stateidnew = value.villageDetails![i]!.stateId;
+                var userId = value.villageDetails![i]!.userId;
+                var villageIddetails = value.villageDetails![i]!.villageId;
+                var villageName = value.villageDetails![i]!.villageName;
+                var totalNoOfScheme = value.villageDetails![i]!.totalNoOfScheme;
+                var totalNoOfWaterSource =
+                    value.villageDetails![i]!.totalNoOfWaterSource;
+                var totalWsGeoTagged =
+                    value.villageDetails![i]!.totalWsGeoTagged;
+                var pendingWsTotal = value.villageDetails![i]!.pendingWsTotal;
+                var balanceWsTotal = value.villageDetails![i]!.balanceWsTotal;
+                var totalSsGeoTagged =
+                    value.villageDetails![i]!.totalSsGeoTagged;
+                var pendingApprovalSsTotal =
+                    value.villageDetails![i]!.pendingApprovalSsTotal;
+                var totalIbRequiredGeoTagged =
+                    value.villageDetails![i]!.totalIbRequiredGeoTagged;
+                var totalIbGeoTagged =
+                    value.villageDetails![i]!.totalIbGeoTagged;
+                var pendingIbTotal = value.villageDetails![i]!.pendingIbTotal;
+                var balanceIbTotal = value.villageDetails![i]!.balanceIbTotal;
+                var totalOaGeoTagged =
+                    value.villageDetails![i]!.totalOaGeoTagged;
+                var balanceOaTotal = value.villageDetails![i]!.balanceOaTotal;
+                var totalNoOfSchoolScheme =
+                    value.villageDetails![i]!.totalNoOfSchoolScheme;
+                var totalNoOfPwsScheme =
+                    value.villageDetails![i]!.totalNoOfPwsScheme;
+
+                databaseHelperJalJeevan?.insertMastervillagedetails(
+                    Localmasterdatamodal_VillageDetails(
+                  status: "0",
+                  stateName: stateName,
+                  districtName: districtName,
+                  blockName: blockName,
+                  panchayatName: panchayatName,
+                  stateId: stateidnew.toString(),
+                  userId: userId.toString(),
+                  villageId: villageIddetails.toString(),
+                  villageName: villageName,
+                  totalNoOfScheme: totalNoOfScheme.toString(),
+                  totalNoOfWaterSource: totalNoOfWaterSource.toString(),
+                  totalWsGeoTagged: totalWsGeoTagged.toString(),
+                  pendingWsTotal: pendingWsTotal.toString(),
+                  balanceWsTotal: balanceWsTotal.toString(),
+                  totalSsGeoTagged: totalSsGeoTagged.toString(),
+                  pendingApprovalSsTotal: pendingApprovalSsTotal.toString(),
+                  totalIbRequiredGeoTagged: totalIbRequiredGeoTagged.toString(),
+                  totalIbGeoTagged: totalIbGeoTagged.toString(),
+                  pendingIbTotal: pendingIbTotal.toString(),
+                  balanceIbTotal: balanceIbTotal.toString(),
+                  totalOaGeoTagged: totalOaGeoTagged.toString(),
+                  balanceOaTotal: balanceOaTotal.toString(),
+                  totalNoOfSchoolScheme: totalNoOfSchoolScheme.toString(),
+                  totalNoOfPwsScheme: totalNoOfPwsScheme.toString(),
+                ));
+              }
+
+              for (int i = 0; i < value.schmelist!.length; i++) {
+                var sourceType = value.schmelist![i]!.source_type;
+                var schemeidnew = value.schmelist![i]!.schemeid;
+                var villageid = value.schmelist![i]!.villageId;
+                var schemenamenew = value.schmelist![i]!.schemename;
+                var schemenacategorynew = value.schmelist![i]!.category;
+                var SourceTypeCategoryId =
+                    value.schmelist![i]!.SourceTypeCategoryId;
+                var sourceTypecategory =
+                    value.schmelist![i]!.source_typeCategory;
+
+                databaseHelperJalJeevan
+                    ?.insertMasterSchmelist(Localmasterdatamoda_Scheme(
+                  source_type: sourceType.toString(),
+                  schemeid: schemeidnew.toString(),
+                  villageId: villageid.toString(),
+                  schemename: schemenamenew.toString(),
+                  category: schemenacategorynew.toString(),
+                  SourceTypeCategoryId: SourceTypeCategoryId.toString(),
+                  source_typeCategory: sourceTypecategory.toString(),
+                ));
+              }
+
+              for (int i = 0; i < value.sourcelist!.length; i++) {
+                var sourceId = value.sourcelist![i]!.sourceId;
+                var SchemeId = value.sourcelist![i]!.schemeId;
+                var stateid = value.sourcelist![i]!.stateid;
+                var Schemename = value.sourcelist![i]!.schemeName;
+                var villageid = value.sourcelist![i]!.villageId;
+                var sourceTypeId = value.sourcelist![i]!.sourceTypeId;
+                var statename = value.sourcelist![i]!.stateName;
+                var sourceTypeCategoryId =
+                    value.sourcelist![i]!.sourceTypeCategoryId;
+                var habitationId = value.sourcelist![i]!.habitationId;
+                var villageName = value.sourcelist![i]!.villageName;
+                var existTagWaterSourceId =
+                    value.sourcelist![i]!.existTagWaterSourceId;
+                var isApprovedState = value.sourcelist![i]!.isApprovedState;
+                var landmark = value.sourcelist![i]!.landmark;
+                var latitude = value.sourcelist![i]!.latitude;
+                var longitude = value.sourcelist![i]!.longitude;
+                var habitationName = value.sourcelist![i]!.habitationName;
+                var location = value.sourcelist![i]!.location;
+                var sourceTypeCategory =
+                    value.sourcelist![i]!.sourceTypeCategory;
+                var sourceType = value.sourcelist![i]!.sourceType;
+                var districtName = value.sourcelist![i]!.districtName;
+                var districtId = value.sourcelist![i]!.districtId;
+                var panchayatNamenew = value.sourcelist![i]!.panchayatName;
+                var blocknamenew = value.sourcelist![i]!.blockName;
+
+                databaseHelperJalJeevan
+                    ?.insertMasterSourcedetails(LocalSourcelistdetailsModal(
+                  schemeId: SchemeId.toString(),
+                  sourceId: sourceId.toString(),
+                  villageId: villageid.toString(),
+                  schemeName: Schemename,
+                  sourceTypeId: sourceTypeId.toString(),
+                  sourceTypeCategoryId: sourceTypeCategoryId.toString(),
+                  habitationId: habitationId.toString(),
+                  existTagWaterSourceId: existTagWaterSourceId.toString(),
+                  isApprovedState: isApprovedState.toString(),
+                  landmark: landmark,
+                  latitude: latitude.toString(),
+                  longitude: longitude.toString(),
+                  habitationName: habitationName,
+                  location: location,
+                  sourceTypeCategory: sourceTypeCategory,
+                  sourceType: sourceType,
+                  stateName: statename,
+                  districtName: districtName,
+                  blockName: blocknamenew,
+                  panchayatName: panchayatNamenew,
+                  districtId: districtId.toString(),
+                  villageName: villageName,
+                  stateId: stateid.toString(),
+                ));
+              }
+
+              for (int i = 0; i < value.habitationlist!.length; i++) {
+                var villafgeid = value.habitationlist![i]!.villageId;
+                var habitationId = value.habitationlist![i]!.habitationId;
+                var habitationName = value.habitationlist![i]!.habitationName;
+
+                databaseHelperJalJeevan?.insertMasterhabitaionlist(
+                    LocalHabitaionlistModal(
+                        villageId: villafgeid.toString(),
+                        HabitationId: habitationId.toString(),
+                        HabitationName: habitationName.toString()));
+              }
+              for (int i = 0; i < value.informationBoardList!.length; i++) {
+                databaseHelperJalJeevan?.insertmastersibdetails(
+                    LocalmasterInformationBoardItemModal(
+                        userId:
+                            value.informationBoardList![i]!.userId.toString(),
+                        villageId: value.informationBoardList![i]!.villageId
+                            .toString(),
+                        stateId:
+                            value.informationBoardList![i]!.stateId.toString(),
+                        schemeId:
+                            value.informationBoardList![i]!.schemeId.toString(),
+                        districtName:
+                            value.informationBoardList![i]!.districtName,
+                        blockName: value.informationBoardList![i]!.blockName,
+                        panchayatName:
+                            value.informationBoardList![i]!.panchayatName,
+                        villageName:
+                            value.informationBoardList![i]!.villageName,
+                        habitationName:
+                            value.informationBoardList![i]!.habitationName,
+                        latitude:
+                            value.informationBoardList![i]!.latitude.toString(),
+                        longitude: value.informationBoardList![i]!.longitude
+                            .toString(),
+                        sourceName: value.informationBoardList![i]!.sourceName,
+                        schemeName: value.informationBoardList![i]!.schemeName,
+                        message: value.informationBoardList![i]!.message,
+                        status:
+                            value.informationBoardList![i]!.status.toString()));
+              }
+            });
+          } else if (box.read("appvaersion") != versionapk) {
+            SchedulerBinding.instance.addPostFrameCallback((_) {
+              showAlertDialogforupdateapp(context);
+              return;
+            });
+          }
         });
         setState(() {
           hasinternetconnection = true;
         });
+
+        setState(() {
+          cleartable_ofmastersourceandcategory();
+          getcategoryApi(context, box.read("UserToken").toString());
+          getsourcetyprASSETApi(context, box.read("UserToken"));
+        });
       }
+
+      /*  Stylefile.showmessageforvalidationtrue(
+          context,
+          "Master data downloaded successfully.");*/
     } on SocketException catch (_) {
+      List<Myresponse> dataList =
+          await databaseHelperJalJeevan!.fetchData_fromdb_ofdashboard();
       setState(() {
         hasinternetconnection = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("No Internet connection available"
-              // message.data["myname"]
-
-              )));
-      OfflineScreenDatabase(context);
-    }
-  }
-
-
-
-  Future getData() async {
-    setState(() {
-      _loading = true;
-    });
-    var url = '${Apiservice.baseurl}'
-            "JJM_Mobile/GetUsermenu?UserId=" +
-        widget.userid.toString() +
-        "&StateId=" +
-        widget.stateid;
-    final response =
-        await http.post(Uri.parse(url), headers: {"APIKey": widget.usertoken});
-
-    myresponse = Myresponse.fromJson(jsonDecode(response.body));
-
-// Convert JSON objects to Dart objects
-    //  List<DashboardLocalModal> dataList = jsonList.map((jsonObject) => DashboardLocalModal.fromMap(jsonObject)).toList();
-
-    //List<DashboardLocalModal> dataList = listone.map((jsonObject) => DashboardLocalModal.fromMap(jsonObject)).toList();
-
-    //  databaseHelperJalJeevan!.insertData(dataList);
-//    print("jjmwe"   +dataList[0].username.toString());
-
-    print("ffff" +myresponse!.status.toString());
-    if(myresponse!.status.toString()=="false"){
-     setState(() {
-       Get.off(LoginScreen());
-box.remove("UserToken").toString();
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-         content: Text(myresponse!.message.toString()),
-
-       ));
-
-
-     });
-
-    }else{
-      List<Result>? listResult = myresponse!.result!;
 
       setState(() {
-        if (myresponse!.result == null || myresponse!.status == "false") {
-          Get.offAll(LoginScreen());
-        }
-        else {
-          dbmainlist = myresponse!.result!;
-          username = myresponse!.userName.toString();
-          UserDescription = myresponse!.userDescription.toString();
-          UserDescription = myresponse!.userDescription.toString();
-         // box.write("username", value["UserFirstName"].toString());
-          box.write("username", myresponse!.userName.toString());
-          usernameofusername = myresponse!.userName.toString();
-          Mobile = myresponse!.Mobile.toString();
-          Designation = myresponse!.Designation.toString();
+        for (Myresponse myresponse in dataList) {
+          username = myresponse.userName.toString();
+          UserDescription = myresponse.userDescription.toString();
+          listResult = myresponse.result!;
+
+          truncateTable_duplicate_entryofdashboarDB();
+          truncateTable_duplicate_entryforassetsourcetypeB();
+          truncateTable_duplicate_entryforsourcecategory();
 
           try {
             for (var listResultmainmenu in listResult) {
@@ -322,7 +920,6 @@ box.remove("UserToken").toString();
                         subheadingofmainmenulist.subHeadingMenuId.toString();
                     dbleftsubheadingmenu =
                         subheadingofmainmenulist.subHeading.toString();
-
                     for (var lables in subResult!) {
                       leftmenuheadingmenuid = lables.lableMenuId.toString();
                       leftmenuheading = lables.lableText.toString();
@@ -335,9 +932,32 @@ box.remove("UserToken").toString();
                     dbleftheadinglable = leftmenuheading;
                     dbleftheadingvalue = leftmenuheadingvalue;
                   }
-                }
-                // water supply pws
-                else if (listResultmainmenu.menuId == "1") {
+                  for (var subheadingofmainmenulist in subheadingmenulist) {
+                    subResult = subheadingofmainmenulist.result;
+                    subHeadingmenuid =
+                        subheadingofmainmenulist.subHeadingMenuId.toString();
+                    dbleftsubheadingmenu =
+                        subheadingofmainmenulist.subHeading.toString();
+
+                    for (var lables in subResult!) {
+                      leftmenuheadingmenuid = lables.lableMenuId.toString();
+                      leftmenuheading = lables.lableText.toString();
+                      leftmenuheadingvalue = lables.lableValue.toString();
+
+                      var tv = "click here";
+                      assignedvillage = lables.lableValue.toString();
+
+                      if (lables.lableMenuId.toString() == "22") {
+                        pwstotalscheme = lables.lableValue.toString();
+                      }
+                      if (lables.lableMenuId.toString() == "23") {
+                        awsschoolschemetotal = lables.lableValue.toString();
+                      }
+                      totalSchemes = int.parse(pwstotalscheme) +
+                          int.parse(awsschoolschemetotal);
+                    }
+                  }
+                } else if (listResultmainmenu.menuId == "1") {
                   List<SubHeadingmenulist>? subheadingmenulist =
                       listResultmainmenu.subHeadingmenulist;
                   mainHeadingmenuwatersuipply =
@@ -378,25 +998,22 @@ box.remove("UserToken").toString();
                         leftmenuheadingvalue = lables.lableValue.toString();
                         leftmenuheadingicon = lables.icon.toString();
                       }
-                    }
-                    // scheme information board
-                    else if (subHeadingmenuid == "9") {
+                    } else if (subHeadingmenuid == "9") {
                       schemeinfosubheading =
                           subheadingofmainmenulist.subHeading.toString();
                       subResulgeotaggingassignvillageschemelist =
                           subheadingofmainmenulist.result;
                       for (var lables
-                      in subResulgeotaggingassignvillageschemelist!) {
+                          in subResulgeotaggingassignvillageschemelist!) {
                         schemeinformationtext = lables.lableText.toString();
                         schemeinformationvalue = lables.lableValue.toString();
                         schemeinformationicon = lables.icon.toString();
                       }
-                    }
-                    // Otherassets
-                    else if (subHeadingmenuid == "10") {
+                    } else if (subHeadingmenuid == "10") {
                       subheadingotherscemeasset =
                           subheadingofmainmenulist.subHeading.toString();
-                      subResult_utherassetslist = subheadingofmainmenulist.result;
+                      subResult_utherassetslist =
+                          subheadingofmainmenulist.result;
                       for (var lables in subResult_utherassetslist!) {
                         otherassetstext = lables.lableText.toString();
                         otherassetstextvalue = lables.lableValue.toString();
@@ -416,14 +1033,14 @@ box.remove("UserToken").toString();
                     if (subHeadingmenuid == "32") {
                       downloadsampleone =
                           subheadingofmainmenulist.subHeading.toString();
-                      downloadsamplevillagelist = subheadingofmainmenulist.result;
+                      downloadsamplevillagelist =
+                          subheadingofmainmenulist.result;
                       for (var lables in downloadsamplevillagelist!) {}
                     } else if (subHeadingmenuid == "33") {
                       downloadsmapletwo =
                           subheadingofmainmenulist.subHeading.toString();
                       downloadsamplevillagelisttwo =
                           subheadingofmainmenulist.result;
-
                     } else if (subHeadingmenuid.toString() == "26") {
                       subheadingvillage =
                           subheadingofmainmenulist.subHeading.toString();
@@ -458,800 +1075,1175 @@ box.remove("UserToken").toString();
                 }
               }
             }
-          } catch (e) {
-          } finally {
-            setState(() {
-              _loading = false;
-            });
-          }
-
-          // databaseHelperJalJeevan!.
-          databaseHelperJalJeevan?.insertDashboarddataindb(DashboardLocalModal(
-            id: 0,
-            //userid: widget.userid.toString(),
-            username: username.toString(),
-            userdescription: UserDescription.toString().toString(),
-            leftheadingmenuid: dbleftheadingmenuid.toString(),
-            leftheading: dbleftheadingmain.toString(),
-            subheadingleftmenuid: dbleftsubheadingmenuid.toString(),
-            SubHeadingleftmenu: dbleftsubheadingmenu.toString(),
-            leftmenulableMenuId: dbleftheadinglablemenuid.toString(),
-            leftmenuLableText: dbleftheadinglable.toString(),
-            leftmenuLableValue: dbleftheadingvalue.toString(),
-          ));
+          } catch (e) {}
         }
       });
+
+      setState(() {
+        _loading = false;
+      });
     }
-
-
   }
 
+  Future getcategoryApi(
+    BuildContext context,
+    String token,
+  ) async {
+    var uri = Uri.parse(
+        '${Apiservice.baseurl}Master/GetSourceCategorylist?UserId=' +
+            box.read("userid"));
+    var response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'APIKey': token ?? 'DEFAULT_API_KEY'
+      },
+    );
+    if (response.statusCode == 200) {
+      Map<String, dynamic> mResposne = jsonDecode(response.body);
 
+      mainListsourcecategory = mResposne["Result"];
+
+      getSourceCategoryModal =
+          GetSourceCategoryModal.fromJson(jsonDecode(response.body));
+
+      await databaseHelperJalJeevan
+          ?.insertData_mastersource_categorytype_inDB(getSourceCategoryModal)
+          .then((value) {});
+      for (int i = 0; i < mainListsourcecategory.length; i++) {
+        SourceTypeCategoryIdget =
+            mainListsourcecategory[i]!["SourceTypeCategoryId"].toString();
+        SourceTypeCategoryList_id.add(SourceTypeCategoryIdget);
+
+        final SourceTypeCategory =
+            mainListsourcecategory[i]!["SourceTypeCategory"];
+        SourceTypeCategoryList.add(SourceTypeCategory);
+
+        final sourcetypeid = mainListsourcecategory[i]!["SourceTypeId"];
+        sourcetypelistone_id.add(sourcetypeid);
+
+        final jsonList =
+            SourceTypeCategoryList.map((item) => jsonEncode(item)).toList();
+        final uniqueJsonList = jsonList.toSet().toList();
+        distinctlist = uniqueJsonList.map((item) => jsonDecode(item)).toList();
+
+        final categoryid =
+            SourceTypeCategoryList_id.map((item) => jsonEncode(item)).toList();
+        final categorylist = categoryid.toSet().toList();
+        distinct_categorylist =
+            categorylist.map((item) => jsonDecode(item)).toList();
+
+        if (SourceTypeCategory == "Ground Water") {
+          if (SourceTypeCategoryIdget.toString() == "1") {
+            minisource.add(mainListsourcecategory[i]!["SourceType"].toString());
+            sourcetypeidlistone
+                .add(mainListsourcecategory[i]!["SourceTypeId"].toString());
+          }
+        } else if (SourceTypeCategory == "Surface Water") {
+          if (SourceTypeCategoryIdget.toString() == "2") {
+            minisource2
+                .add(mainListsourcecategory[i]!["SourceType"].toString());
+            sourcetypeidlist
+                .add(mainListsourcecategory[i]!["SourceTypeId"].toString());
+          }
+        }
+      }
+    }
+    return jsonDecode(response.body);
+  }
+
+  Future getData() async {
+    var url = '${Apiservice.baseurl}'
+            "JJM_Mobile/GetUsermenu?UserId=" +
+        widget.userid.toString() +
+        "&StateId=" +
+        widget.stateid;
+    final response =
+        await http.post(Uri.parse(url), headers: {"APIKey": widget.usertoken});
+
+    myresponse = Myresponse.fromJson(jsonDecode(response.body));
+
+    if (myresponse!.status.toString() == "false") {
+      setState(() {
+        Get.off(const LoginScreen());
+        box.remove("UserToken").toString();
+
+        cleartable_localmastertables();
+        Stylefile.showmessageforvalidationfalse(
+            context, "Please login, your token has been expired!");
+      });
+    } else {
+      try {
+        listResult = myresponse!.result!;
+
+        await databaseHelperJalJeevan!.insertData_dashboard_inDB(myresponse!);
+
+        truncateTable_duplicate_entryofdashboarDB();
+        truncateTable_duplicate_entryforassetsourcetypeB();
+
+        setState(() {
+          if (myresponse!.result == null || myresponse!.status == "false") {
+            Get.offAll(const LoginScreen());
+            box.remove("UserToken").toString();
+          } else {
+            dbmainlist = myresponse!.result!;
+            username = myresponse!.userName.toString();
+            UserDescription = myresponse!.userDescription.toString();
+            box.write("username", myresponse!.userName.toString());
+            Mobile = myresponse!.Mobile.toString();
+            Designation = myresponse!.Designation.toString();
+
+            try {
+              for (var listResultmainmenu in listResult) {
+                for (int i = 0; i < listResult.length; i++) {
+                  if (listResultmainmenu.menuId == "20") {
+                    List<SubHeadingmenulist>? subheadingmenulist =
+                        listResultmainmenu.subHeadingmenulist;
+
+                    for (var subheadingofmainmenulist in subheadingmenulist!) {
+                      subResult = subheadingofmainmenulist.result;
+                      subHeadingmenuid =
+                          subheadingofmainmenulist.subHeadingMenuId.toString();
+                      dbleftsubheadingmenu =
+                          subheadingofmainmenulist.subHeading.toString();
+
+                      for (var lables in subResult!) {
+                        leftmenuheadingmenuid = lables.lableMenuId.toString();
+                        leftmenuheading = lables.lableText.toString();
+                        leftmenuheadingvalue = lables.lableValue.toString();
+
+                        if (lables.lableMenuId.toString() == "21") {
+                          assignedvillage = lables.lableValue.toString();
+                        }
+
+                        if (lables.lableMenuId.toString() == "35") {
+                          var tv = "click here";
+
+                          workingvillage = lables.lableValue.toString();
+                          if (lables.lableValue == "0") {}
+                          if (lables.lableMenuId.toString() == "22") {
+                            pwstotalscheme = lables.lableValue.toString();
+                          }
+                          if (lables.lableMenuId.toString() == "23") {
+                            awsschoolschemetotal = lables.lableValue.toString();
+                          }
+                          totalSchemes = int.parse(pwstotalscheme) +
+                              int.parse(awsschoolschemetotal);
+                        }
+                      }
+                    }
+                  } else if (listResultmainmenu.menuId == "1") {
+                    List<SubHeadingmenulist>? subheadingmenulist =
+                        listResultmainmenu.subHeadingmenulist;
+                    mainHeadingmenuwatersuipply =
+                        listResultmainmenu.heading.toString();
+                    for (var subheadingofmainmenulist in subheadingmenulist!) {
+                      subResultofstatusewatersupply =
+                          subheadingofmainmenulist.result;
+                      watersupplyheading =
+                          subheadingofmainmenulist.subHeading.toString();
+
+                      if (subHeadingmenuid == "24") {
+                        for (var lables in subResultofstatusewatersupply!) {
+                          leftmenuheading = lables.lableText.toString();
+                          leftmenuheadingvalue = lables.lableValue.toString();
+                          leftmenuheadingicon = lables.icon.toString();
+                        }
+                      }
+                    }
+                  } else if (listResultmainmenu.menuId == "2") {
+                    List<SubHeadingmenulist>? subheadingmenulist =
+                        listResultmainmenu.subHeadingmenulist;
+                    mainHeadingmenugeotagging =
+                        listResultmainmenu.heading.toString();
+
+                    for (var subheadingofmainmenulist in subheadingmenulist!) {
+                      subheadinggeotag_pwssource =
+                          subheadingofmainmenulist.subHeading.toString();
+                      subHeadingmenuid =
+                          subheadingofmainmenulist.subHeadingMenuId.toString();
+
+                      if (subHeadingmenuid.toString() == "8") {
+                        pwsSubHeading =
+                            subheadingofmainmenulist.subHeading.toString();
+                        subResulgeotaggingassignvillagelist =
+                            subheadingofmainmenulist.result;
+                        for (var lables
+                            in subResulgeotaggingassignvillagelist!) {
+                          leftmenuheading = lables.lableText.toString();
+                          leftmenuheadingvalue = lables.lableValue.toString();
+                          leftmenuheadingicon = lables.icon.toString();
+                        }
+                      } else if (subHeadingmenuid == "9") {
+                        schemeinfosubheading =
+                            subheadingofmainmenulist.subHeading.toString();
+                        subResulgeotaggingassignvillageschemelist =
+                            subheadingofmainmenulist.result;
+                        for (var lables
+                            in subResulgeotaggingassignvillageschemelist!) {
+                          schemeinformationtext = lables.lableText.toString();
+                          schemeinformationvalue = lables.lableValue.toString();
+                          schemeinformationicon = lables.icon.toString();
+                        }
+                      } else if (subHeadingmenuid == "10") {
+                        subheadingotherscemeasset =
+                            subheadingofmainmenulist.subHeading.toString();
+                        subResult_utherassetslist =
+                            subheadingofmainmenulist.result;
+                        for (var lables in subResult_utherassetslist!) {
+                          otherassetstext = lables.lableText.toString();
+                          otherassetstextvalue = lables.lableValue.toString();
+                          otherassetstexticon = lables.icon.toString();
+                        }
+                      }
+                    }
+                  } else if (listResultmainmenu.menuId == "3") {
+                    List<SubHeadingmenulist>? subheadingmenulist =
+                        listResultmainmenu.subHeadingmenulist;
+                    villagenotcertified = listResultmainmenu.heading.toString();
+
+                    for (var subheadingofmainmenulist in subheadingmenulist!) {
+                      subHeadingmenuid =
+                          subheadingofmainmenulist.subHeadingMenuId.toString();
+
+                      if (subHeadingmenuid == "32") {
+                        downloadsampleone =
+                            subheadingofmainmenulist.subHeading.toString();
+                        downloadsamplevillagelist =
+                            subheadingofmainmenulist.result;
+                        for (var lables in downloadsamplevillagelist!) {}
+                      } else if (subHeadingmenuid == "33") {
+                        downloadsmapletwo =
+                            subheadingofmainmenulist.subHeading.toString();
+                        downloadsamplevillagelisttwo =
+                            subheadingofmainmenulist.result;
+                      } else if (subHeadingmenuid.toString() == "26") {
+                        subheadingvillage =
+                            subheadingofmainmenulist.subHeading.toString();
+                        villagenotcertifiedlist =
+                            subheadingofmainmenulist.result;
+                        for (var lables in villagenotcertifiedlist!) {
+                          leftmenuheading = lables.lableText.toString();
+                          leftmenuheadingvalue = lables.lableValue.toString();
+                          leftmenuheadingicon = lables.icon.toString();
+                        }
+                      }
+                    }
+                  } else if (listResultmainmenu.menuId.toString() == "4") {
+                    List<SubHeadingmenulist>? subheadingmenulist =
+                        listResultmainmenu.subHeadingmenulist;
+                    headinghgjdesination =
+                        listResultmainmenu.heading.toString();
+
+                    for (var subheadingofmainmenulist in subheadingmenulist!) {
+                      subHeadingmenuid =
+                          subheadingofmainmenulist.subHeadingMenuId.toString();
+                      subHeading_desingtion =
+                          subheadingofmainmenulist.subHeading.toString();
+                      subresultdesinationlist = subheadingofmainmenulist.result;
+
+                      if (subHeadingmenuid.toString() == "29") {
+                        for (var lables in subresultdesinationlist!) {
+                          leftmenuheading = lables.lableText.toString();
+                          leftmenuheadingvalue = lables.lableValue.toString();
+                          leftmenuheadingicon = lables.icon.toString();
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+
+              setState(() {});
+            } finally {
+              setState(() {
+                _loading = false;
+              });
+            }
+          }
+        });
+      } catch (e) {}
+    }
+  }
+
+  Future getsourcetyprASSETApi(
+    BuildContext context,
+    String token,
+  ) async {
+    setState(() {
+      _loading = true;
+    });
+    var uri = Uri.parse(
+        '${Apiservice.baseurl}Master/Get_AssetTaggingType?UserId=' +
+            box.read("userid"));
+    var response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'APIKey': token ?? 'DEFAULT_API_KEY'
+      },
+    );
+    if (response.statusCode == 200) {
+      Map<String, dynamic> mResposne = jsonDecode(response.body);
+      if (mResposne["Status"].toString() == "false") {
+        setState(() {
+          Get.offAll(const LoginScreen());
+          box.remove("UserToken").toString();
+        });
+      } else {
+        Listofsourcetype = mResposne["Result"];
+        savesourcetypemodal =
+            Savesourcetypemodal.fromJson(jsonDecode(response.body));
+        await databaseHelperJalJeevan
+            ?.insertData_mastersourcetype_inDB(savesourcetypemodal);
+        return jsonDecode(response.body);
+      }
+    }
+    setState(() {
+      _loading = false;
+    });
+  }
+
+  void showAlertDialogforupdateapp(BuildContext context) async {
+    List<String> messageParts =
+        box.read("appAPKVersionMessage").toString().split("\\n");
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            backgroundColor: Appcolor.white,
+            titlePadding: const EdgeInsets.only(top: 0, left: 0, right: 00),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 5),
+            buttonPadding: const EdgeInsets.all(00),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(
+                Radius.circular(
+                  5.0,
+                ),
+              ),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            title: Container(
+              color: Appcolor.red,
+              child: const Padding(
+                padding:
+                    EdgeInsets.only(left: 10, top: 10, bottom: 10, right: 5),
+                child: Text(
+                  'Note :',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Appcolor.white),
+                ),
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: ListBody(
+                children: <Widget>[
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: messageParts.map((part) {
+                      return Text(
+                        part,
+                        textAlign: TextAlign.start,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w400),
+                      );
+                    }).toList(),
+                  )
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    totalpwssource == "0" &&
+                            totalstoragestructureofflineentreies == "0" &&
+                            totalsibboard == "0" &&
+                            totalotherassetsofflineentreies == "0"
+                        ? Container(
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(
+                                color: Appcolor.red,
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: TextButton(
+                              onPressed: () {
+                                try {
+                                  launch(box.read("appAPKURL"));
+                                } on PlatformException {
+                                  launch(box.read("appAPKURL"));
+                                } finally {
+                                  launch(box.read("appAPKURL"));
+                                }
+                                cleartable_localmasterschemelisttable();
+                                Get.offAll(const LoginScreen());
+                              },
+                              child: const Text(
+                                'Download & update',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Appcolor.black,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(
+                                color: Appcolor.red,
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: TextButton(
+                              onPressed: () {},
+                              child: const Text(
+                                'Download & update',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Appcolor.black,
+                                ),
+                              ),
+                            ),
+                          ),
+                    const SizedBox(
+                      height: 15,
+                    ),
+                    totalpwssource == "0" &&
+                            totalstoragestructureofflineentreies == "0" &&
+                            totalsibboard == "0" &&
+                            totalotherassetsofflineentreies == "0"
+                        ? const SizedBox()
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  "You have some offline entries available\nplease upload then Download & update.",
+                                  textAlign: TextAlign.start,
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400),
+                                ),
+                              ),
+                              const SizedBox(
+                                height: 15,
+                              ),
+                              SizedBox(
+                                height: 40,
+                                child: Directionality(
+                                  textDirection: TextDirection.rtl,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      elevation: 6,
+                                      backgroundColor: Appcolor.orange,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10.0),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      try {
+                                        final result =
+                                            await InternetAddress.lookup(
+                                                'example.com');
+                                        if (result.isNotEmpty &&
+                                            result[0].rawAddress.isNotEmpty) {
+                                          Totaluploadofflineserver_appupdatecase()
+                                              .then((value) {
+                                            setState(() {
+                                              totalpwssource.isEmpty;
+                                              totalstoragestructureofflineentreies
+                                                  .isEmpty;
+                                              totalsibboard.isEmpty;
+                                              totalotherassetsofflineentreies
+                                                  .isEmpty;
+                                            });
+                                            // Navigator.of(context).pop();
+                                            // showAlertDialogforupdateapp(context);
+                                            Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (BuildContext
+                                                            context) =>
+                                                        super.widget));
+                                          });
+                                          cleartable_localmasterschemelisttable();
+                                        }
+                                      } on SocketException catch (_) {
+                                        Stylefile.showmessageforvalidationfalse(
+                                            context,
+                                            "Unable to Connect to the Internet. Please check your network settings.");
+                                      }
+                                      //Get.offAll(LoginScreen());
+                                      // cleartable_localmasterschemelisttable();
+                                    },
+                                    label: const Text('Upload to server',
+                                        style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Appcolor.white)),
+                                    icon: const Icon(
+                                      Icons.upload,
+                                      color: Colors.white,
+                                      size: 30.0,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: showExitPopup,
-      child: Scaffold(
-          appBar: AppBar(
-              automaticallyImplyLeading: false,
-              centerTitle: true,
-              title: const Text(
-                'Dashboard',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: Colors.white),
-              ),
-              backgroundColor: Appcolor.bgcolor,
-              elevation: 5,
-              actions: [
-                IconButton(
-                  onPressed: () async {
-                    try {
-                      final result =
-                          await InternetAddress.lookup('example.com');
-                      if (result.isNotEmpty &&
-                          result[0].rawAddress.isNotEmpty) {
-                        getData();
-                        FocusScope.of(context).unfocus();
-
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(const SnackBar(
-                                content: Text("Conected to the Internet"
-                                    // message.data["myname"]
-
-                                    )));
-                      }
-                    } on SocketException catch (_) {
-                      Utilityclass.showInternetDialog(context);
-                    }
-                  },
-                  icon: const Icon(
-                    Icons.sync,
-                    color: Appcolor.white,
-                    size: 30,
-                  ),
+      child: FocusDetector(
+        onFocusGained: () {
+          setState(() {
+            getData();
+            getallpwssaveoffline();
+            getallsibsaveoffline();
+            getallotherassetssaveoffline();
+            getallstoragestructuresaveoffline();
+          });
+        },
+        child: Scaffold(
+            appBar: PreferredSize(
+              preferredSize: const Size.fromHeight(40.0),
+              child: AppBar(
+                automaticallyImplyLeading: false,
+                centerTitle: true,
+                iconTheme: const IconThemeData(
+                  color: Appcolor.white,
                 ),
-                IconButton(
-                  onPressed: () {
-                    // _launchURL();
-
-                    Get.to(const DBPractice());
-                  },
-                  icon: const Icon(
-                    Icons.web,
-                    color: Appcolor.white,
-                    size: 30,
-                  ),
+                title: const Text(
+                  'Home',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.white),
                 ),
-              ]),
-          body: Container(
-              height: MediaQuery.of(context).size.height,
-              width: MediaQuery.of(context).size.width,
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                    image: AssetImage('images/header_bg.png'),
-                    fit: BoxFit.cover),
+                backgroundColor: Appcolor.bgcolor,
+                elevation: 5,
               ),
-              child: _loading == true
-                  ? Center(
-                      child: SizedBox(
-                          height: 40,
-                          width: 40,
-                          child: Image.asset("images/loading.gif")),
-                    )
-                  : SingleChildScrollView(
-                      child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Visibility(
-                          visible:
-                              Provider.of<InternetConnectionStatus>(context) ==
-                                  InternetConnectionStatus.disconnected,
-                          child: const InternetNotAvailable(),
-                        ),
-                        Column(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(10.0),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+            ),
+            body: Stack(
+              children: [
+                Container(
+                  height: MediaQuery.of(context).size.height,
+                  width: MediaQuery.of(context).size.width,
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                        image: AssetImage('images/header_bg.png'),
+                        fit: BoxFit.cover),
+                  ),
+                  child: _loading == true
+                      ? const Center(
+                          child: SizedBox(
+                              height: 40,
+                              width: 40,
+                              child: CircularProgressIndicator(
+                                  color: Appcolor.btncolor)),
+                        )
+                      : SingleChildScrollView(
+                          child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            const SizedBox(
+                              height: 10,
+                            ),
+                            Column(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(10.0),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        SizedBox(
-                                          width: 60,
-                                          height: 60,
-                                          child: Image.asset(
-                                            'images/bharat.png',
-                                            width: 60,
-                                            height: 60,
-                                          ),
-                                        ),
-                                        Container(
-                                          child: const Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Jal Jeevan Mission',
-                                                style: TextStyle(
-                                                    color: Colors.black,
-                                                    fontSize: 18,
-                                                    fontWeight:
-                                                        FontWeight.bold),
-                                              ),
-                                              Text(
-                                                'Department of Drinking Water and Sanitation',
-                                                style: TextStyle(
-                                                  color: Colors.black,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                              Text(
-                                                'Ministry of Jal Shakti',
-                                                style: TextStyle(
-                                                    color: Colors.black,
-                                                    fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    InkWell(
-                                      onTap: () {
-                                        showDialog(
-                                            context: context,
-                                            builder: (context) {
-                                              return Container(
-                                                child: AlertDialog(
-                                                  title: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment.start,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      SizedBox(
-                                                        width: double.infinity,
-                                                        child: Padding(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .only(
-                                                                    left: 5,
-                                                                    right: 5),
-                                                            child: Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .start,
-                                                              crossAxisAlignment:
-                                                                  CrossAxisAlignment
-                                                                      .start,
-                                                              children: [
-                                                                const SizedBox(
-                                                                  width: 80,
-                                                                  child: Text(
-                                                                    "Name :",
-                                                                    maxLines: 3,
-                                                                    style: TextStyle(
-                                                                        color: Appcolor
-                                                                            .grey,
-                                                                        fontSize:
-                                                                            12),
-                                                                  ),
-                                                                ),
-                                                                Text(
-                                                                  " $usernameofusername",
-                                                                  maxLines: 3,
-                                                                  style: const TextStyle(
-                                                                      color: Appcolor
-                                                                          .black,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .bold,
-                                                                      fontSize:
-                                                                          14),
-                                                                ),
-                                                              ],
-                                                            )),
-                                                      ),
-                                                      SizedBox(
-                                                        width: double.infinity,
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(5.0),
-                                                          child: Row(
-                                                            mainAxisAlignment:
-                                                                MainAxisAlignment
-                                                                    .start,
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              const SizedBox(
-                                                                width: 80,
-                                                                child: Text(
-                                                                  "Mobile No. :",
-                                                                  maxLines: 3,
-                                                                  style: TextStyle(
-                                                                      color: Appcolor
-                                                                          .grey,
-                                                                      fontSize:
-                                                                          12),
-                                                                ),
-                                                              ),
-                                                              Text(
-                                                                " $Mobile",
-                                                                maxLines: 3,
-                                                                style: const TextStyle(
-                                                                    color: Appcolor
-                                                                        .black,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                    fontSize:
-                                                                        14),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      SizedBox(
-                                                        width: double.infinity,
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .only(
-                                                                  left: 5,
-                                                                  right: 5),
-                                                          child: Row(
-                                                            mainAxisAlignment:
-                                                                MainAxisAlignment
-                                                                    .start,
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              const SizedBox(
-                                                                width: 80,
-                                                                child: Text(
-                                                                  "Desingation :",
-                                                                  maxLines: 3,
-                                                                  style: TextStyle(
-                                                                      color: Appcolor
-                                                                          .grey,
-                                                                      fontSize:
-                                                                          12),
-                                                                ),
-                                                              ),
-                                                              Text(
-                                                                " $Designation",
-                                                                maxLines: 3,
-                                                                style: const TextStyle(
-                                                                    color: Appcolor
-                                                                        .black,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                    fontSize:
-                                                                        14),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      )
-                                                    ],
-                                                  ),
-                                                  actions: [
-                                                    SizedBox(
-                                                      child: Center(
-                                                          child: Container(
-                                                        height: 40,
-                                                        color:
-                                                            Appcolor.btncolor,
-                                                        width: MediaQuery.of(
-                                                                context)
-                                                            .size
-                                                            .width,
-                                                        child: Row(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .spaceBetween,
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .center,
-                                                          children: [
-                                                            Expanded(
-                                                              child:
-                                                                  ElevatedButton(
-                                                                style: ElevatedButton
-                                                                    .styleFrom(
-                                                                  backgroundColor:
-                                                                      Appcolor
-                                                                          .btncolor,
-                                                                  shape:
-                                                                      RoundedRectangleBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                            0.0),
-                                                                  ),
-                                                                ),
-                                                                onPressed: () =>
-                                                                    Navigator.of(
-                                                                            context)
-                                                                        .pop(
-                                                                            false),
-                                                                child:
-                                                                    const Text(
-                                                                  'Cancel',
-                                                                  style: TextStyle(
-                                                                      color: Appcolor
-                                                                          .white),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Expanded(
-                                                              child:
-                                                                  ElevatedButton(
-                                                                style: ElevatedButton
-                                                                    .styleFrom(
-                                                                  backgroundColor:
-                                                                      Appcolor
-                                                                          .greenmessagecolor,
-                                                                  shape:
-                                                                      RoundedRectangleBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                            0.0),
-                                                                  ),
-                                                                ),
-                                                                onPressed: () {
-                                                                  box.remove("UserToken");
-                                                                  box.remove('loginBool');
-                                                                  Get.off(
-                                                                      LoginScreen());
-                                                                },
-                                                                child: const Text(
-                                                                    'Sign Out',
-                                                                    style: TextStyle(
-                                                                        color: Appcolor
-                                                                            .white)),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      )),
-                                                    )
-                                                  ],
-                                                ),
-                                              );
-                                            });
-                                      },
-                                      child: ClipRRect(
-                                        borderRadius:
-                                            BorderRadius.circular(20.0),
-                                        child: Image.asset('images/profile.png',
-                                            width: 50.0, height: 50.0),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 10,
-                              ),
-                              Container(
-                                decoration: BoxDecoration(
-                                  //4b0082
-                                  color:
-                                      const Color(0xFFC2C2C2).withOpacity(0.3),
-                                  border: Border.all(
-                                    color: const Color(0xFFC2C2C2)
-                                        .withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                  borderRadius: const BorderRadius.all(
-                                    Radius.circular(
-                                      10.0,
-                                    ),
-                                  ),
-                                ),
-                                margin: const EdgeInsets.all(10),
-                                child: SizedBox(
-                                    width: double.infinity,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(5.0),
-                                      child: Column(
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Image.asset(
-                                                "images/profile.png",
-                                                // Replace with your logo file path
+                                        Row(
+                                          children: [
+                                            SizedBox(
+                                              child: Image.asset(
+                                                'images/bharat.png',
                                                 width: 60,
                                                 height: 60,
                                               ),
-                                              const SizedBox(
-                                                width: 10,
-                                              ),
-                                              Column(
+                                            ),
+                                            Container(
+                                              child: const Column(
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    username.toString(),
-                                                    style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 16,
-                                                        color: Colors.black),
-                                                  ),
-                                                  Container(
-                                                    width: 200,
+                                                      Textfile.headingjaljeevan,
+                                                      textAlign:
+                                                          TextAlign.justify,
+                                                      style: Stylefile
+                                                          .mainheadingstyle),
+                                                  SizedBox(
                                                     child: Text(
-                                                      maxLines: 3,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      UserDescription
-                                                          .toString(),
-                                                      style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.w400,
-                                                          fontSize: 14,
-                                                          color: Appcolor.dark),
-                                                    ),
+                                                        Textfile
+                                                            .subheadingjaljeevan,
+                                                        textAlign:
+                                                            TextAlign.start,
+                                                        style: Stylefile
+                                                            .submainheadingstyle),
                                                   ),
                                                 ],
-                                              )
-                                            ],
-                                          ),
-                                          const SizedBox(
-                                            height: 10,
-                                          ),
-                                          Container(
-                                              padding: const EdgeInsets.all(2),
-                                              // height: 45,
-                                              decoration: BoxDecoration(
-                                                  color: Colors.white,
-                                                  borderRadius:
-                                                      BorderRadius.circular(8)),
-                                              child: ScrollConfiguration(
-                                                behavior: const ScrollBehavior()
-                                                    .copyWith(
-                                                        overscroll: false),
-                                                child: ListView.builder(
-                                                    itemCount:
-                                                        subResult!.length,
-                                                    shrinkWrap: true,
-                                                    physics:
-                                                        const NeverScrollableScrollPhysics(),
-                                                    itemBuilder:
-                                                        (context, int index) {
-                                                      return Container(
-                                                        margin: const EdgeInsets
-                                                            .all(2),
-                                                        child: Material(
-                                                          elevation: 2.0,
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(
-                                                                  10.0),
-                                                          child: InkWell(
-                                                            splashColor: Appcolor
-                                                                .splashcolor,
-                                                            customBorder:
-                                                                RoundedRectangleBorder(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          10.0),
-                                                            ),
-                                                            onTap: () {},
-                                                            child: Container(
-                                                              margin:
-                                                                  const EdgeInsets
-                                                                      .all(5),
-                                                              child: Row(
-                                                                  children: [
-                                                                    const Icon(
-                                                                      Icons
-                                                                          .radio_button_checked,
-                                                                      size: 20,
-                                                                      color: Colors
-                                                                          .orange,
-                                                                    ),
-                                                                    const SizedBox(
-                                                                      width: 10,
-                                                                    ),
-                                                                    Padding(
-                                                                      padding: const EdgeInsets
-                                                                          .all(
-                                                                          5.0),
-                                                                      child:
-                                                                          Text(
-                                                                        "${subResult![index].lableText} : ${subResult![index].lableValue}",
-                                                                        style: const TextStyle(
-                                                                            color:
-                                                                                Appcolor.black,
-                                                                            fontWeight: FontWeight.w500),
-                                                                      ),
-                                                                    )
-                                                                  ]),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }),
-                                              ))
-                                        ],
-                                      ),
-                                    )),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.only(
-                                  left: 10,
-                                  right: 10,
-                                ),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    //4b0082
-                                    color: const Color(0xFFC2C2C2)
-                                        .withOpacity(0.3),
-                                    border: Border.all(
-                                      color: const Color(0xFFC2C2C2)
-                                          .withOpacity(0.3),
-                                      width: 1,
-                                    ),
-                                    borderRadius: const BorderRadius.all(
-                                      Radius.circular(
-                                        10.0,
-                                      ), //
-                                    ),
-                                  ),
-                                  child: Column(children: [
-                                    Container(
-                                      margin: const EdgeInsets.all(5),
-                                      height: 45,
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(5.0),
-                                      decoration: BoxDecoration(
-                                          color: const Color(0xFF0B2E7C),
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(5.0),
-                                        child: Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: Text(
-                                              mainHeadingmenuwatersuipply,
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 16,
-                                                  color: Colors.white),
-                                            )),
-                                      ),
-                                    ),
-                                    Column(
-                                      children: [
-                                        Padding(
-                                            padding: const EdgeInsets.only(
-                                                left: 5, right: 5, top: 5),
-                                            child: Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: watersupplyheading ==
-                                                        "Blank"
-                                                    ? const SizedBox()
-                                                    : Text(
-                                                        watersupplyheading,
-                                                        style: const TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.w500,
-                                                            color: Colors.blue,
-                                                            fontSize: 16),
-                                                      ))),
-                                        Padding(
-                                          padding: const EdgeInsets.all(5),
-                                          child: GridView.builder(
-                                            physics:
-                                                const NeverScrollableScrollPhysics(),
-                                            shrinkWrap: true,
-                                            gridDelegate:
-                                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 2,
-                                              // number of items in each row
-                                              mainAxisSpacing: 5.0,
-                                              // spacing between rows
-                                              crossAxisSpacing: 5.0,
-                                              childAspectRatio: (340.0 /
-                                                  220.0), // spacing between columns
+                                              ),
                                             ),
-                                            // padding around the grid
-                                            itemCount:
-                                                subResultofstatusewatersupply!
-                                                    .length,
-                                            // total number of items
-                                            itemBuilder: (context, index) {
-                                              return Container(
-                                                margin: const EdgeInsets.all(0),
-                                                decoration: BoxDecoration(
-                                                  color: Appcolor.white,
-                                                  border: Border.all(
-                                                    color: Appcolor.white,
-                                                    width: 1,
-                                                  ),
-                                                  borderRadius:
-                                                      const BorderRadius.all(
-                                                    Radius.circular(
-                                                      10.0,
-                                                    ), //
-                                                  ),
-                                                ),
-                                                child: Material(
-                                                  elevation: 2.0,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
-                                                  child: InkWell(
-                                                    splashColor:
-                                                        Appcolor.splashcolor,
-                                                    customBorder:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              10.0),
+                                          ],
+                                        ),
+                                        InkWell(
+                                          onTap: () {
+                                            showDialog<void>(
+                                              context: context,
+                                              barrierDismissible: true,
+                                              builder: (BuildContext context) {
+                                                return AlertDialog(
+                                                  backgroundColor:
+                                                      Appcolor.white,
+                                                  titlePadding:
+                                                      const EdgeInsets.only(
+                                                          top: 0,
+                                                          left: 0,
+                                                          right: 00),
+                                                  buttonPadding:
+                                                      const EdgeInsets.all(10),
+                                                  shape:
+                                                      const RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.all(
+                                                      Radius.circular(
+                                                        5.0,
+                                                      ),
                                                     ),
-                                                    onTap: () {},
-                                                    child: Row(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .spaceBetween,
-                                                      children: [
-                                                        Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Padding(
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .all(8.0),
-                                                              child: Text(
-                                                                subResultofstatusewatersupply![
-                                                                        index]
-                                                                    .lableValue
-                                                                    .toString(),
-                                                                style: const TextStyle(
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w500,
-                                                                    fontSize:
-                                                                        16),
-                                                              ),
-                                                            ),
-                                                            SizedBox(
-                                                              width: 90,
-                                                              child: Padding(
-                                                                padding:
-                                                                    const EdgeInsets
-                                                                        .all(
-                                                                        8.0),
-                                                                child: Text(
-                                                                  subResultofstatusewatersupply![
-                                                                          index]
-                                                                      .lableText
-                                                                      .toString(),
-                                                                  maxLines: 3,
-                                                                  overflow:
-                                                                      TextOverflow
-                                                                          .ellipsis,
-                                                                  softWrap:
-                                                                      true,
-                                                                  style: const TextStyle(
-                                                                      fontSize:
-                                                                          11,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w500),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
+                                                  ),
+                                                  actionsAlignment:
+                                                      MainAxisAlignment.center,
+                                                  title: Container(
+                                                    color: Appcolor.red,
+                                                    child: const Center(
+                                                      child: Padding(
+                                                        padding:
+                                                            EdgeInsets.all(8.0),
+                                                        child: Text(
+                                                          "Jal jeevan mission",
+                                                          style: TextStyle(
+                                                              fontSize: 18,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: Appcolor
+                                                                  .white),
                                                         ),
-                                                        SizedBox(
-                                                          width: 50,
-                                                          height: 90,
-                                                          child: Center(
-                                                            child: CachedNetworkImage(
-                                                                cacheManager:
-                                                                    customCacheManager,
-                                                                key:
-                                                                    UniqueKey(),
-                                                                imageUrl: subResultofstatusewatersupply![
-                                                                        index]
-                                                                    .icon
-                                                                    .toString(),
-                                                                fit:
-                                                                    BoxFit.fill,
-                                                                progressIndicatorBuilder: (context,
-                                                                        url,
-                                                                        downloadProgress) =>
-                                                                    Transform.scale(
-                                                                        scale:
-                                                                            .4,
-                                                                        child: CircularProgressIndicator(
-                                                                            value: downloadProgress
-                                                                                .progress)),
-                                                                errorWidget: (context,
-                                                                        url,
-                                                                        error) =>
-                                                                    const Icon(
-                                                                        Icons.image)),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  content:
+                                                      const SingleChildScrollView(
+                                                    child: ListBody(
+                                                      children: <Widget>[
+                                                        Padding(
+                                                          padding:
+                                                              EdgeInsets.all(
+                                                                  8.0),
+                                                          child: Text(
+                                                            "Are you sure want to sign out from this application ?",
+                                                            style: TextStyle(
+                                                                fontSize: 16,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: Appcolor
+                                                                    .black),
                                                           ),
                                                         ),
                                                       ],
                                                     ),
                                                   ),
-                                                ),
-                                              );
-                                            },
+                                                  actions: <Widget>[
+                                                    Container(
+                                                      height: 40,
+                                                      width: 100,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white,
+                                                        border: Border.all(
+                                                          color: Appcolor.red,
+                                                          width: 1,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
+                                                      ),
+                                                      child: TextButton(
+                                                        child: const Text(
+                                                          'No',
+                                                          style: TextStyle(
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: Appcolor
+                                                                  .black),
+                                                        ),
+                                                        onPressed: () {
+                                                          Navigator.of(context)
+                                                              .pop();
+                                                        },
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                      height: 40,
+                                                      width: 100,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white,
+                                                        border: Border.all(
+                                                          color: Appcolor.red,
+                                                          width: 1,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
+                                                      ),
+                                                      child: TextButton(
+                                                        child: const Text(
+                                                          'Yes',
+                                                          style: TextStyle(
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: Appcolor
+                                                                  .black),
+                                                        ),
+                                                        onPressed: () async {
+                                                          Navigator.of(context)
+                                                              .pop();
+
+                                                          box.remove(
+                                                              "UserToken");
+                                                          box.remove(
+                                                              'loginBool');
+                                                          cleartable_localmasterschemelisttable();
+
+                                                          Get.offAll(
+                                                              const LoginScreen());
+
+                                                          Stylefile
+                                                              .showmessageforvalidationtrue(
+                                                                  context,
+                                                                  "Sign out successfully");
+                                                        },
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            );
+                                          },
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(20.0),
+                                            child: const Icon(
+                                              Icons.logout,
+                                              size: 35,
+                                              color: Appcolor.btncolor,
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(
-                                          height: 8,
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: 10,
+                                  ),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFC2C2C2)
+                                          .withOpacity(0.3),
+                                      border: Border.all(
+                                        color: const Color(0xFFC2C2C2)
+                                            .withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                      borderRadius: const BorderRadius.all(
+                                        Radius.circular(
+                                          10.0,
                                         ),
-                                        Container(
+                                      ),
+                                    ),
+                                    margin: const EdgeInsets.all(10),
+                                    child: SizedBox(
+                                        width: double.infinity,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(5.0),
+                                          child: Column(
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Image.asset(
+                                                    "images/profile.png",
+                                                    width: 60,
+                                                    height: 60,
+                                                  ),
+                                                  const SizedBox(
+                                                    width: 10,
+                                                  ),
+                                                  Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        username.toString(),
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 20,
+                                                            color:
+                                                                Colors.black),
+                                                      ),
+                                                      SizedBox(
+                                                        width: 250,
+                                                        child: Text(
+                                                          maxLines: 3,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          UserDescription
+                                                              .toString(),
+                                                          style: const TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w400,
+                                                              fontSize: 16,
+                                                              color: Appcolor
+                                                                  .dark),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  )
+                                                ],
+                                              ),
+                                              const SizedBox(
+                                                height: 10,
+                                              ),
+                                              subResult!.isEmpty
+                                                  ? const SizedBox()
+                                                  : Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .start,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(2),
+                                                            decoration: BoxDecoration(
+                                                                color: Colors
+                                                                    .white,
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            8)),
+                                                            child:
+                                                                ScrollConfiguration(
+                                                              behavior: const ScrollBehavior()
+                                                                  .copyWith(
+                                                                      overscroll:
+                                                                          false),
+                                                              child: ListView
+                                                                  .builder(
+                                                                      itemCount:
+                                                                          subResult!
+                                                                              .length,
+                                                                      shrinkWrap:
+                                                                          true,
+                                                                      physics:
+                                                                          const NeverScrollableScrollPhysics(),
+                                                                      itemBuilder:
+                                                                          (context,
+                                                                              int index) {
+                                                                        if (subResult![index].lableMenuId.toString() ==
+                                                                            "21") {
+                                                                          assignedvillage = subResult![index]
+                                                                              .lableValue
+                                                                              .toString();
+                                                                        }
+
+                                                                        if (subResult![index].lableMenuId.toString() ==
+                                                                            "22") {
+                                                                          pwstotalscheme = subResult![index]
+                                                                              .lableValue
+                                                                              .toString();
+                                                                        }
+                                                                        if (subResult![index].lableMenuId.toString() ==
+                                                                            "23") {
+                                                                          awsschoolschemetotal = subResult![index]
+                                                                              .lableValue
+                                                                              .toString();
+                                                                        }
+                                                                        try {
+                                                                          totalSchemes =
+                                                                              int.parse(pwstotalscheme) + int.parse(awsschoolschemetotal);
+                                                                        } catch (e) {
+                                                                          debugPrintStack();
+                                                                        }
+                                                                        return Container(
+                                                                          margin: const EdgeInsets
+                                                                              .all(
+                                                                              2),
+                                                                          child:
+                                                                              Material(
+                                                                            elevation:
+                                                                                2.0,
+                                                                            borderRadius:
+                                                                                BorderRadius.circular(10.0),
+                                                                            child:
+                                                                                InkWell(
+                                                                              splashColor: Appcolor.splashcolor,
+                                                                              customBorder: RoundedRectangleBorder(
+                                                                                borderRadius: BorderRadius.circular(10.0),
+                                                                              ),
+                                                                              onTap: () {},
+                                                                              child: Container(
+                                                                                margin: const EdgeInsets.all(5),
+                                                                                child: Row(children: [
+                                                                                  subResult![index].lableMenuId == "21"
+                                                                                      ? const SizedBox()
+                                                                                      : const Icon(
+                                                                                          Icons.radio_button_checked,
+                                                                                          size: 20,
+                                                                                          color: Colors.orange,
+                                                                                        ),
+                                                                                  const SizedBox(
+                                                                                    width: 10,
+                                                                                  ),
+                                                                                  Padding(
+                                                                                    padding: const EdgeInsets.all(2.0),
+                                                                                    child: Row(
+                                                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                                                      children: [
+                                                                                        subResult![index].lableMenuId.toString() == "35"
+                                                                                            ? Row(
+                                                                                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                                                                crossAxisAlignment: CrossAxisAlignment.center,
+                                                                                                children: [
+                                                                                                  Text("${subResult![index].lableText}  : ${subResult![index].lableValue} ", style: const TextStyle(color: Appcolor.black, fontSize: 17, fontWeight: FontWeight.w500)),
+                                                                                                  const SizedBox(
+                                                                                                    width: 10,
+                                                                                                  ),
+                                                                                                  GestureDetector(
+                                                                                                    onTap: () {
+                                                                                                      if (assignedvillage == "0") {
+                                                                                                        Stylefile.showmessageapierrors(context, "There is no assigned villages to you please contact to division officer.");
+                                                                                                      } else {
+                                                                                                        Get.to(Villagelistzero(assignedvillage: assignedvillage));
+                                                                                                      }
+                                                                                                    },
+                                                                                                    child: const Padding(
+                                                                                                      padding: EdgeInsets.all(0.0),
+                                                                                                      child: Icon(
+                                                                                                        Icons.edit_note_outlined,
+                                                                                                        color: Appcolor.btncolor,
+                                                                                                        size: 30,
+                                                                                                      ),
+                                                                                                    ),
+                                                                                                  )
+                                                                                                ],
+                                                                                              )
+                                                                                            : Text(
+                                                                                                "${subResult![index].lableText} : ${subResult![index].lableValue} ",
+                                                                                                style: const TextStyle(color: Appcolor.black, fontSize: 17, fontWeight: FontWeight.w500),
+                                                                                              )
+                                                                                      ],
+                                                                                    ),
+                                                                                  )
+                                                                                ]),
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      }),
+                                                            )),
+                                                        const SizedBox(
+                                                          height: 5,
+                                                        ),
+                                                      ],
+                                                    )
+                                            ],
+                                          ),
+                                        )),
+                                  ),
+                                  Container(
+                                    margin: const EdgeInsets.only(
+                                        left: 10,
+                                        right: 10,
+                                        top: 1,
+                                        bottom: 10),
+                                    child: Material(
+                                      elevation: 6.0,
+                                      color: const Color(0xFF0D3A98),
+                                      borderRadius: BorderRadius.circular(10.0),
+                                      child: InkWell(
+                                        splashColor: Appcolor.splashcolor,
+                                        customBorder: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10.0),
+                                        ),
+                                        onTap: () {
+                                          if (assignedvillage == "0") {
+                                            Stylefile.showmessageapierrors(
+                                                context,
+                                                "There is no village assigned to you. Please contact to division officer.");
+                                          } else if (workingvillage == "0") {
+                                            if (workingvillage == "0") {
+                                              Stylefile
+                                                  .showmessageforvalidationtrue(
+                                                      context,
+                                                      "There is no villages assigned to you. Please select villages first.");
+                                              Get.to(Villagelistzero(
+                                                  assignedvillage:
+                                                      assignedvillage));
+                                            }
+                                          } else {
+                                            Get.to(Selectedvillaglist(
+                                              stateId: stateId,
+                                              userId: userid,
+                                              usertoken: usertoken!,
+                                            ));
+                                          }
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 10, right: 0),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              const Text(
+                                                'Add/Geo-tag PWS assets ',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.white,
+                                                  fontSize: 18.0,
+                                                ),
+                                              ),
+                                              Container(
+                                                margin: const EdgeInsets.all(5),
+                                                child: CircleAvatar(
+                                                  minRadius: 20,
+                                                  maxRadius: 20,
+                                                  backgroundColor:
+                                                      const Color(0xffffffff),
+                                                  child: IconButton(
+                                                    color:
+                                                        const Color(0xFF0D3A98),
+                                                    onPressed: () {
+                                                      if (assignedvillage ==
+                                                          "0") {
+                                                        Stylefile
+                                                            .showmessageapierrors(
+                                                                context,
+                                                                "There is no assigned villages to you please contact to division officer.");
+                                                      } else if (workingvillage ==
+                                                          "0") {
+                                                        Stylefile
+                                                            .showmessageapierrors(
+                                                                context,
+                                                                "There is no village assigned to you for geotagging assets. Please select villages first.");
+                                                      } else {
+                                                        Get.to(
+                                                            Selectedvillaglist(
+                                                          stateId: stateId,
+                                                          userId: userid,
+                                                          usertoken: usertoken!,
+                                                        ));
+                                                      }
+                                                    },
+                                                    icon: const Icon(
+                                                      Icons.add,
+                                                      weight: 100,
+                                                      size: 25,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  totalpwssource == "0"
+                                      ? const SizedBox()
+                                      : Container(
                                           margin: const EdgeInsets.only(
-                                              left: 5, right: 5, top: 10),
-                                          child: Material(
-                                            elevation: 2.0,
+                                              left: 10, right: 10),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: Appcolor.btncolor,
+                                              width: 1.0,
+                                            ),
                                             borderRadius:
                                                 BorderRadius.circular(10.0),
+                                          ),
+                                          height: 50,
+                                          child: Material(
+                                            elevation: 6.0,
+                                            color: Appcolor.white,
+                                            borderRadius: BorderRadius.circular(
+                                              10.0,
+                                            ),
                                             child: InkWell(
-                                              splashColor: Appcolor.splashcolor,
                                               customBorder:
                                                   RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10.0),
-                                              ),
-                                              onTap: () {
-                                                /* Get.to(AssignedVillage(
-                                                dbuserid: userid,
-                                                userid: widget.userid,
-                                                usertoken: widget.usertoken,
-                                                stateid: widget.stateid));*/
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10.0)),
+                                              onTap: () async {
+                                                await Get.to(
+                                                    Commonallofflineentries(
+                                                        clickforallscreen:
+                                                            "0"));
+                                                setState(() {});
                                               },
                                               child: Padding(
                                                 padding: const EdgeInsets.only(
@@ -1264,2257 +2256,2845 @@ box.remove("UserToken").toString();
                                                       CrossAxisAlignment.center,
                                                   children: [
                                                     const Text(
-                                                      'Add FHTC',
+                                                      'Tagged PWS Sources (Offline)',
                                                       style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w500,
                                                         color: Colors.black,
                                                         fontSize: 18.0,
                                                       ),
                                                     ),
-                                                    Container(
-                                                      margin:
+                                                    Padding(
+                                                      padding:
                                                           const EdgeInsets.all(
-                                                              5),
-                                                      child: CircleAvatar(
-                                                        minRadius: 20,
-                                                        maxRadius: 20,
-                                                        backgroundColor:
-                                                            const Color(
-                                                                0xFF0D3A98),
-                                                        // radius: 30,
-                                                        child: IconButton(
-                                                          color: Colors.white,
-                                                          onPressed: () {
-                                                            /* Get.to(AssignedVillage(
-                                                            dbuserid: userid,
-                                                            userid:
-                                                            widget.userid,
-                                                            usertoken: widget
-                                                                .usertoken,
-                                                            stateid: widget
-                                                                .stateid));*/
-                                                          },
-                                                          icon: const Icon(
-                                                            Icons.add,
-                                                            size: 20,
-                                                          ),
+                                                              10.0),
+                                                      child: Text(
+                                                        totalpwssource,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Colors.black,
+                                                          fontSize: 20.0,
                                                         ),
                                                       ),
-                                                    )
+                                                    ),
                                                   ],
                                                 ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                    const SizedBox(
-                                      height: 8,
-                                    ),
-                                    Container(
-                                      margin: const EdgeInsets.all(5),
-                                      height: 45,
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(5.0),
-                                      decoration: BoxDecoration(
-                                          color: const Color(0xFF0B2E7C),
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(5.0),
-                                        child: Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: Text(
-                                              mainHeadingmenugeotagging
-                                                  .toString(),
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 16,
-                                                  color: Colors.white),
-                                            )),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                          left: 10, right: 10, top: 10),
-                                      child: Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(
-                                            pwsSubHeading,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                color: Colors.blue,
-                                                fontSize: 16),
-                                          )),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(5),
-                                      child: GridView.builder(
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        shrinkWrap: true,
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 2,
-                                          // number of items in each row
-                                          mainAxisSpacing: 5.0,
-                                          // spacing between rows
-                                          crossAxisSpacing: 5.0,
-                                          childAspectRatio: (340.0 / 220.0),
-                                        ),
-                                        itemCount:
-                                            subResulgeotaggingassignvillagelist!
-                                                .length,
-                                        itemBuilder: (context, index) {
-                                          return Container(
-                                            margin: const EdgeInsets.all(0),
-                                            decoration: BoxDecoration(
-                                              color: Appcolor.white,
-                                              border: Border.all(
-                                                color: Appcolor.white,
-                                                width: 1,
-                                              ),
-                                              borderRadius:
-                                                  const BorderRadius.all(
-                                                Radius.circular(
-                                                  10.0,
-                                                ),
-                                              ),
+                                  const SizedBox(
+                                    height: 10,
+                                  ),
+                                  totalsibboard == "0"
+                                      ? const SizedBox()
+                                      : Container(
+                                          margin: const EdgeInsets.only(
+                                              left: 10, right: 10),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: Appcolor.btncolor,
+                                              width: 1.0,
                                             ),
-                                            child: Material(
-                                              elevation: 2.0,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      10.0),
-                                              child: InkWell(
-                                                splashColor:
-                                                    Appcolor.splashcolor,
-                                                customBorder:
-                                                    RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
-                                                ),
-                                                onTap: () {},
-                                                child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(8.0),
-                                                          child: Text(
-                                                            subResulgeotaggingassignvillagelist![
-                                                                    index]
-                                                                .lableValue
-                                                                .toString(),
-                                                            style: const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                fontSize: 16),
-                                                          ),
-                                                        ),
-                                                        SizedBox(
-                                                          width: 90,
-                                                          child: Padding(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .all(6.0),
-                                                            child: Text(
-                                                              maxLines: 3,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              softWrap: true,
-                                                              subResulgeotaggingassignvillagelist![
-                                                                      index]
-                                                                  .lableText
-                                                                  .toString(),
-                                                              style: const TextStyle(
-                                                                  fontSize: 11,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    SizedBox(
-                                                      width: 50,
-                                                      height: 90,
-                                                      child: Center(
-                                                        child: CachedNetworkImage(
-                                                            cacheManager:
-                                                                customCacheManager,
-                                                            key: UniqueKey(),
-                                                            imageUrl:
-                                                                subResulgeotaggingassignvillagelist![
-                                                                        index]
-                                                                    .icon
-                                                                    .toString(),
-                                                            fit: BoxFit.fill,
-                                                            progressIndicatorBuilder: (context,
-                                                                    url,
-                                                                    downloadProgress) =>
-                                                                Transform.scale(
-                                                                    scale: .4,
-                                                                    child: CircularProgressIndicator(
-                                                                        value: downloadProgress
-                                                                            .progress)),
-                                                            errorWidget: (context,
-                                                                    url,
-                                                                    error) =>
-                                                                const Icon(Icons
-                                                                    .image)),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 10,
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                          left: 10, right: 10),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          schemeinfosubheading,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.blue,
-                                              fontSize: 16),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(5),
-                                      child: GridView.builder(
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        shrinkWrap: true,
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 2,
-                                          childAspectRatio: (340.0 / 220.0),
-
-                                          mainAxisSpacing: 5.0,
-
-                                          crossAxisSpacing:
-                                              5.0, // spacing between columns
-                                        ),
-                                        itemCount:
-                                            subResulgeotaggingassignvillageschemelist!
-                                                .length,
-                                        itemBuilder: (context, index) {
-                                          return Container(
-                                            margin: const EdgeInsets.all(0),
-                                            decoration: BoxDecoration(
-                                              //4b0082
-                                              color: Appcolor.white,
-                                              border: Border.all(
-                                                color: Appcolor.white,
-                                                width: 1,
-                                              ),
-                                              borderRadius:
-                                                  const BorderRadius.all(
-                                                Radius.circular(
-                                                  10.0,
-                                                ), //
-                                              ),
-                                            ),
-                                            child: Material(
-                                              elevation: 2.0,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      10.0),
-                                              child: InkWell(
-                                                splashColor:
-                                                    Appcolor.splashcolor,
-                                                customBorder:
-                                                    RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
-                                                ),
-                                                onTap: () {},
-                                                child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(8.0),
-                                                          child: Text(
-                                                            subResulgeotaggingassignvillageschemelist![
-                                                                    index]
-                                                                .lableValue
-                                                                .toString(),
-                                                            style: const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                fontSize: 16),
-                                                          ),
-                                                        ),
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(5.0),
-                                                          child: SizedBox(
-                                                            width: 80,
-                                                            child: Text(
-                                                              maxLines: 3,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              softWrap: true,
-                                                              subResulgeotaggingassignvillageschemelist![
-                                                                      index]
-                                                                  .lableText
-                                                                  .toString(),
-                                                              style: const TextStyle(
-                                                                  fontSize: 11,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    SizedBox(
-                                                      height: 90,
-                                                      width: 50,
-                                                      child: Center(
-                                                        child: CachedNetworkImage(
-                                                            cacheManager:
-                                                                customCacheManager,
-                                                            key: UniqueKey(),
-                                                            imageUrl:
-                                                                subResulgeotaggingassignvillageschemelist![
-                                                                        index]
-                                                                    .icon
-                                                                    .toString(),
-                                                            fit: BoxFit.fill,
-                                                            progressIndicatorBuilder: (context,
-                                                                    url,
-                                                                    downloadProgress) =>
-                                                                Transform.scale(
-                                                                    scale: .4,
-                                                                    child: CircularProgressIndicator(
-                                                                        value: downloadProgress
-                                                                            .progress)),
-                                                            errorWidget: (context,
-                                                                    url,
-                                                                    error) =>
-                                                                const Icon(Icons
-                                                                    .image)),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 10,
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                          left: 10, right: 10),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          subheadingotherscemeasset,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.blue,
-                                              fontSize: 16),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(5),
-                                      child: GridView.builder(
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        shrinkWrap: true,
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 2,
-                                          childAspectRatio: (340.0 / 220.0),
-                                          // number of items in each row
-                                          mainAxisSpacing: 5.0,
-                                          // spacing between rows
-                                          crossAxisSpacing:
-                                              5.0, // spacing between columns
-                                        ),
-                                        itemCount:
-                                            subResult_utherassetslist!.length,
-                                        itemBuilder: (context, index) {
-                                          return Container(
-                                            margin: const EdgeInsets.all(0),
-                                            decoration: BoxDecoration(
-                                              color: Appcolor.white,
-                                              border: Border.all(
-                                                color: Appcolor.white,
-                                                width: 1,
-                                              ),
-                                              borderRadius:
-                                                  const BorderRadius.all(
-                                                Radius.circular(
-                                                  10.0,
-                                                ),
-                                              ),
-                                            ),
-                                            child: Material(
-                                              elevation: 2.0,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      10.0),
-                                              child: InkWell(
-                                                splashColor:
-                                                    Appcolor.splashcolor,
-                                                customBorder:
-                                                    RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
-                                                ),
-                                                onTap: () {},
-                                                child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.start,
-                                                  children: [
-                                                    Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(8.0),
-                                                          child: Text(
-                                                            subResult_utherassetslist![
-                                                                    index]
-                                                                .lableValue
-                                                                .toString(),
-                                                            style: const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                fontSize: 16),
-                                                          ),
-                                                        ),
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(5.0),
-                                                          child: SizedBox(
-                                                            width: 80,
-                                                            child: Text(
-                                                              maxLines: 3,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              softWrap: true,
-                                                              subResult_utherassetslist![
-                                                                      index]
-                                                                  .lableText
-                                                                  .toString(),
-                                                              style: const TextStyle(
-                                                                  fontSize: 11,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    SizedBox(
-                                                      width: 55,
-                                                      height: 100,
-                                                      child: Center(
-                                                        child: CachedNetworkImage(
-                                                            cacheManager:
-                                                                customCacheManager,
-                                                            key: UniqueKey(),
-                                                            imageUrl:
-                                                                subResult_utherassetslist![
-                                                                        index]
-                                                                    .icon
-                                                                    .toString(),
-                                                            fit: BoxFit.fill,
-                                                            progressIndicatorBuilder: (context,
-                                                                    url,
-                                                                    downloadProgress) =>
-                                                                Transform.scale(
-                                                                    scale: .4,
-                                                                    child: CircularProgressIndicator(
-                                                                        value: downloadProgress
-                                                                            .progress)),
-                                                            errorWidget: (context,
-                                                                    url,
-                                                                    error) =>
-                                                                const Icon(Icons
-                                                                    .image)),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    Container(
-                                      margin: const EdgeInsets.only(
-                                          left: 5, right: 5, top: 10),
-                                      child: Material(
-                                        elevation: 2.0,
-                                        borderRadius:
-                                            BorderRadius.circular(10.0),
-                                        child: InkWell(
-                                          splashColor: Appcolor.splashcolor,
-                                          customBorder: RoundedRectangleBorder(
                                             borderRadius:
                                                 BorderRadius.circular(10.0),
                                           ),
-                                          onTap: () {
-                                            Get.to(AssignedVillage(
-                                                dbuserid: userid,
-                                                userid: widget.userid,
-                                                usertoken: widget.usertoken,
-                                                stateid: widget.stateid));
-                                          },
-                                          child: Padding(
-                                            padding: const EdgeInsets.only(
-                                                left: 10, right: 0),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.center,
-                                              children: [
-                                                const Text(
-                                                  'Add/ Geo-tag PWS assets',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.black,
-                                                    fontSize: 18.0,
-                                                  ),
-                                                ),
-                                                Container(
-                                                  margin:
-                                                      const EdgeInsets.all(5),
-                                                  child: CircleAvatar(
-                                                    minRadius: 20,
-                                                    maxRadius: 20,
-                                                    backgroundColor:
-                                                        const Color(0xFF0D3A98),
-                                                    // radius: 30,
-                                                    child: IconButton(
-                                                      color: Colors.white,
-                                                      onPressed: () {
-                                                        Get.to(AssignedVillage(
-                                                            dbuserid: userid,
-                                                            userid:
-                                                                widget.userid,
-                                                            usertoken: widget
-                                                                .usertoken,
-                                                            stateid: widget
-                                                                .stateid));
-                                                      },
-                                                      icon: const Icon(
-                                                        Icons.add,
-                                                        size: 20,
+                                          height: 50,
+                                          child: Material(
+                                            elevation: 6.0,
+                                            color: Appcolor.white,
+                                            borderRadius:
+                                                BorderRadius.circular(10.0),
+                                            child: InkWell(
+                                              splashColor: Appcolor.splashcolor,
+                                              customBorder:
+                                                  RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10.0),
+                                              ),
+                                              onTap: () async {
+                                                await Get.to(
+                                                    Commonallofflineentries(
+                                                        clickforallscreen:
+                                                            "1"));
+                                                setState(() {});
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10, right: 0),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    const Text(
+                                                      'Information boards (Offline)',
+                                                      style: TextStyle(
+                                                        color: Colors.black,
+                                                        fontSize: 18.0,
                                                       ),
                                                     ),
-                                                  ),
-                                                )
-                                              ],
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              10.0),
+                                                      child: Text(
+                                                        totalsibboard,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Colors.black,
+                                                          fontSize: 20.0,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 12,
-                                    ),
-                                    villagenotcertified==null  ? SizedBox() :   Container(
-                                      margin: const EdgeInsets.all(5),
-                                      height: 45,
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(5.0),
-                                      decoration: BoxDecoration(
-                                          color: const Color(0xFF0B2E7C),
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: Text(
-                                              villagenotcertified,
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 16,
-                                                  color: Colors.white),
-                                            )),
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 10,
-                                    ),
-                                    downloadsampleone== null ? SizedBox() :   Container(
-                                      margin: const EdgeInsets.all(5),
-                                      height: 55,
-                                      width: double.infinity,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
+                                  const SizedBox(
+                                    height: 10,
+                                  ),
+                                  totalotherassetsofflineentreies == "0"
+                                      ? const SizedBox()
+                                      : Container(
+                                          margin: const EdgeInsets.only(
+                                              left: 10, right: 10),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: Appcolor.btncolor,
+                                              width: 1.0,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(10.0),
+                                          ),
+                                          height: 50,
+                                          child: Material(
+                                            elevation: 6.0,
+                                            color: Appcolor.white,
+                                            borderRadius:
+                                                BorderRadius.circular(10.0),
+                                            child: InkWell(
+                                              splashColor: Appcolor.splashcolor,
+                                              customBorder:
+                                                  RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10.0),
+                                              ),
+                                              onTap: () async {
+                                                await Get.to(
+                                                    Commonallofflineentries(
+                                                        clickforallscreen:
+                                                            "2"));
+                                                setState(() {});
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10, right: 0),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    const Text(
+                                                      'Other assets (Offline)',
+                                                      style: TextStyle(
+                                                        color: Colors.black,
+                                                        fontSize: 18.0,
+                                                      ),
+                                                    ),
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              10.0),
+                                                      child: Text(
+                                                        totalotherassetsofflineentreies,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Colors.black,
+                                                          fontSize: 20.0,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                  totalstoragestructureofflineentreies == "0"
+                                      ? const SizedBox()
+                                      : Container(
+                                          margin: const EdgeInsets.only(
+                                              left: 10, top: 10, right: 10),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: Appcolor.btncolor,
+                                              width: 1.0,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(10.0),
+                                          ),
+                                          height: 50,
+                                          child: Material(
+                                            elevation: 6.0,
+                                            color: Appcolor.white,
+                                            borderRadius:
+                                                BorderRadius.circular(10.0),
+                                            child: InkWell(
+                                              splashColor: Appcolor.splashcolor,
+                                              customBorder:
+                                                  RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10.0),
+                                              ),
+                                              onTap: () async {
+                                                await Get.to(
+                                                    Commonallofflineentries(
+                                                        clickforallscreen:
+                                                            "3"));
+                                                setState(() {});
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10, right: 0),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    const Text(
+                                                      'Storage structure (Offline)',
+                                                      style: TextStyle(
+                                                        color: Colors.black,
+                                                        fontSize: 18.0,
+                                                      ),
+                                                    ),
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              10.0),
+                                                      child: Text(
+                                                        totalstoragestructureofflineentreies,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Colors.black,
+                                                          fontSize: 20.0,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                  const SizedBox(
+                                    height: 10,
+                                  ),
+                                  totalsibboard == "0" &&
+                                          totalpwssource == "0" &&
+                                          totalotherassetsofflineentreies ==
+                                              "0" &&
+                                          totalstoragestructureofflineentreies ==
+                                              "0"
+                                      ? const SizedBox()
+                                      : Center(
+                                          child: Container(
+                                            width: MediaQuery.of(context)
+                                                .size
+                                                .width,
+                                            margin: const EdgeInsets.only(
+                                                left: 10,
+                                                right: 10,
+                                                bottom: 10),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFFFFF)
+                                                  .withOpacity(0.3),
+                                              borderRadius:
+                                                  const BorderRadius.all(
+                                                Radius.circular(10.0),
+                                              ),
+                                            ),
+                                            child: SizedBox(
+                                              height: 40,
+                                              child: Directionality(
+                                                textDirection:
+                                                    TextDirection.rtl,
+                                                child: ElevatedButton.icon(
+                                                  style:
+                                                      ElevatedButton.styleFrom(
+                                                    elevation: 6,
+                                                    backgroundColor:
+                                                        Appcolor.orange,
+                                                    shape:
+                                                        RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10.0),
+                                                    ),
+                                                  ),
+                                                  label: const Text(
+                                                    'Upload to server',
+                                                    style: TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Appcolor.white),
+                                                  ),
+                                                  onPressed: () async {
+                                                    try {
+                                                      final result =
+                                                          await InternetAddress
+                                                              .lookup(
+                                                                  'example.com');
+                                                      if (result.isNotEmpty &&
+                                                          result[0]
+                                                              .rawAddress
+                                                              .isNotEmpty) {
+                                                        if (box
+                                                                .read(
+                                                                    "UserToken")
+                                                                .toString() ==
+                                                            "null") {
+                                                          box.remove(
+                                                              "UserToken");
+                                                          box.remove(
+                                                              'loginBool');
+                                                          cleartable_localmasterschemelisttable();
+                                                          Get.off(
+                                                              const LoginScreen());
+                                                          Stylefile
+                                                              .showmessageforvalidationfalse(
+                                                                  context,
+                                                                  "Please login your token has been expired!");
+                                                        } else {
+                                                          setState(() {
+                                                            Totaluploadofflineserver()
+                                                                .then((value) {
+                                                              Navigator.pushReplacement(
+                                                                  context,
+                                                                  MaterialPageRoute(
+                                                                      builder: (BuildContext
+                                                                              context) =>
+                                                                          super
+                                                                              .widget));
+                                                            });
+                                                          });
+                                                        }
+                                                      }
+                                                    } on SocketException catch (_) {
+                                                      Stylefile
+                                                          .showmessageforvalidationfalse(
+                                                              context,
+                                                              "Unable to Connect to the Internet. Please check your network settings.");
+                                                    }
+                                                    setState(() {
+                                                      getallpwssaveoffline();
+                                                      getallsibsaveoffline();
+                                                      getallotherassetssaveoffline();
+                                                    });
+                                                  },
+                                                  icon: const Icon(
+                                                    Icons.upload,
+                                                    color: Colors.white,
+                                                    size: 30.0,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                  Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                          left: 10,
+                                          right: 10,
+                                          top: 5,
+                                          bottom: 8),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
                                           color: Colors.white,
+                                          border: Border.all(
+                                            color: Appcolor.grey,
+                                            width: 1.0,
+                                          ),
                                           borderRadius:
-                                              BorderRadius.circular(10)),
-                                      child: TextButton(
-                                        onPressed: () {},
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 20,
-                                              child: IconButton(
-                                                color: Colors.orange,
-                                                onPressed: () {},
-                                                icon: const Icon(
-                                                  Icons.download_rounded,
-                                                  size: 20,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(
-                                              width: 5,
-                                            ),
-                                            downloadsampleone==null  ? SizedBox() :  SizedBox(
-                                              width: 200,
-                                              child: Text(
-                                                downloadsampleone.toString(),
-                                                maxLines: 3,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.black,
-                                                  fontSize: 14.0,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                              BorderRadius.circular(10.0),
+                                        ),
+                                        child: const Text(
+                                          textAlign: TextAlign.left,
+                                          "Note : All the geo tagging entries are to be synced once the internet is available.",
+                                          style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w400,
+                                              color: Colors.red),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(
-                                      height: 5,
-                                    ),
-                                    downloadsmapletwo==null ? SizedBox() :   GestureDetector(
-                                      onTap: () {
-                                        //Navigator.pushNamed(context, 'assignedvillage');
-                                      },
-                                      child: Container(
-                                        margin: const EdgeInsets.only(
-                                            left: 5,
-                                            top: 5,
-                                            bottom: 5,
-                                            right: 5),
-                                        height: 55,
-                                        width: double.infinity,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius:
-                                                BorderRadius.circular(10)),
-                                        child: TextButton(
-                                          onPressed: () {},
+                                  ),
+                                  Container(
+                                    margin: const EdgeInsets.only(
+                                        left: 10,
+                                        right: 10,
+                                        top: 5,
+                                        bottom: 10),
+                                    child: Material(
+                                      elevation: 6.0,
+                                      color: const Color(0xFF0D3A98),
+                                      borderRadius: BorderRadius.circular(10.0),
+                                      child: InkWell(
+                                        splashColor: Appcolor.splashcolor,
+                                        customBorder: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10.0),
+                                        ),
+                                        onTap: () {
+                                          Get.to(FHTCAssignedVillage(
+
+                                              userid: widget.userid,
+                                              usertoken: widget.usertoken,
+                                              stateid: widget.stateid));
+                                          // Get.to(Village_details(villageid:Villa));
+                                          //   Get.to(FHTCAssignedVillage());
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 10, right: 0),
                                           child: Row(
                                             mainAxisAlignment:
-                                                MainAxisAlignment.start,
+                                                MainAxisAlignment.spaceBetween,
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.center,
                                             children: [
-                                              CircleAvatar(
-                                                radius: 20,
-                                                child: IconButton(
-                                                  color: Colors.orange,
-                                                  onPressed: () {},
-                                                  icon: const Icon(
-                                                    Icons.download_rounded,
-                                                    size: 20,
-                                                  ),
+                                              const Text(
+                                                'Add FHTC',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.white,
+                                                  fontSize: 18.0,
                                                 ),
                                               ),
-                                              const SizedBox(
-                                                width: 5,
-                                              ),
-                                              SizedBox(
-                                                width: 200,
-                                                child: Text(
-                                                  downloadsmapletwo.toString(),
-                                                  maxLines: 3,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.black,
-                                                    fontSize: 14.0,
+                                              Container(
+                                                margin: const EdgeInsets.all(5),
+                                                /**/
+                                                child: CircleAvatar(
+                                                  minRadius: 20,
+                                                  maxRadius: 20,
+                                                  backgroundColor:
+                                                      const Color(0xffffffff),
+                                                  child: IconButton(
+                                                    color:
+                                                        const Color(0xFF0D3A98),
+                                                    onPressed: () {},
+                                                    icon: const Icon(
+                                                      Icons.add,
+                                                      size: 25,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
+                                              )
                                             ],
                                           ),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(
-                                      height: 10,
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.only(
+                                      left: 10,
+                                      right: 10,
                                     ),
-                                    subheadingvillage==null ? SizedBox() :   Padding(
-                                      padding: const EdgeInsets.only(
-                                          left: 10, right: 10),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          subheadingvillage.toString(),
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.blue,
-                                              fontSize: 16),
+                                    child: Container(
+                                      child: Column(children: [
+                                        const SizedBox(
+                                          height: 8,
                                         ),
-                                      ),
-                                    ),
-                                    villagenotcertifiedlist!.length == 0 ? SizedBox() :   Padding(
-                                      padding: const EdgeInsets.all(5),
-                                      child: GridView.builder(
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        shrinkWrap: true,
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 2,
-                                          mainAxisSpacing: 5.0,
-                                          crossAxisSpacing: 5.0,
-                                          childAspectRatio: (340.0 /
-                                              220.0), // spacing between columns
-                                        ),
-                                        itemCount:
-                                            villagenotcertifiedlist!.length,
-                                        itemBuilder: (context, index) {
-                                          return Container(
-                                            margin: const EdgeInsets.all(0),
-                                            decoration: BoxDecoration(
-                                              color: Appcolor.white,
-                                              border: Border.all(
-                                                color: Appcolor.white,
-                                                width: 1,
-                                              ),
-                                              borderRadius:
-                                                  const BorderRadius.all(
-                                                Radius.circular(
-                                                  10.0,
+                                        mainHeadingmenugeotagging == ""
+                                            ? const SizedBox()
+                                            : Container(
+                                                margin: const EdgeInsets.all(5),
+                                                height: 45,
+                                                width: double.infinity,
+                                                padding:
+                                                    const EdgeInsets.all(5.0),
+                                                decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFF0B2E7C),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8)),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.all(5.0),
+                                                  child: Align(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: Text(
+                                                        mainHeadingmenugeotagging
+                                                            .toString(),
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            fontSize: 18,
+                                                            color:
+                                                                Colors.white),
+                                                      )),
                                                 ),
                                               ),
-                                            ),
-                                            child: Material(
-                                              elevation: 2.0,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      10.0),
-                                              child: InkWell(
-                                                splashColor:
-                                                    Appcolor.splashcolor,
-                                                customBorder:
-                                                    RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
+                                        pwsSubHeading == null
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10,
+                                                    right: 10,
+                                                    top: 10),
+                                                child: Align(
+                                                    alignment:
+                                                        Alignment.centerLeft,
+                                                    child: Text(
+                                                      pwsSubHeading,
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Colors.blue,
+                                                          fontSize: 18),
+                                                    )),
+                                              ),
+                                        subResulgeotaggingassignvillagelist!
+                                                .isEmpty
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding:
+                                                    const EdgeInsets.all(5),
+                                                child: GridView.builder(
+                                                  physics:
+                                                      const NeverScrollableScrollPhysics(),
+                                                  shrinkWrap: true,
+                                                  gridDelegate:
+                                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 2,
+                                                    mainAxisSpacing: 4.0,
+                                                    crossAxisSpacing: 4.0,
+                                                    childAspectRatio:
+                                                        (370.0 / 260.0),
+                                                  ),
+                                                  itemCount:
+                                                      subResulgeotaggingassignvillagelist!
+                                                          .length,
+                                                  itemBuilder:
+                                                      (context, index) {
+                                                    return Container(
+                                                      margin:
+                                                          const EdgeInsets.all(
+                                                              0),
+                                                      decoration: BoxDecoration(
+                                                        color: Appcolor.white,
+                                                        border: Border.all(
+                                                          color: Appcolor.white,
+                                                          width: 1,
+                                                        ),
+                                                        borderRadius:
+                                                            const BorderRadius
+                                                                .all(
+                                                          Radius.circular(
+                                                            10.0,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      child: Material(
+                                                        elevation: 2.0,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10.0),
+                                                        child: InkWell(
+                                                          splashColor: Appcolor
+                                                              .splashcolor,
+                                                          customBorder:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10.0),
+                                                          ),
+                                                          onTap: () {},
+                                                          child: Row(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .spaceBetween,
+                                                            children: [
+                                                              Column(
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .start,
+                                                                children: [
+                                                                  Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            8.0),
+                                                                    child: Text(
+                                                                      subResulgeotaggingassignvillagelist![
+                                                                              index]
+                                                                          .lableValue
+                                                                          .toString(),
+                                                                      style: const TextStyle(
+                                                                          fontWeight: FontWeight
+                                                                              .w500,
+                                                                          fontSize:
+                                                                              20),
+                                                                    ),
+                                                                  ),
+                                                                  SizedBox(
+                                                                    width: 125,
+                                                                    child:
+                                                                        Padding(
+                                                                      padding: const EdgeInsets
+                                                                          .all(
+                                                                          5.0),
+                                                                      child:
+                                                                          Text(
+                                                                        maxLines:
+                                                                            4,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        softWrap:
+                                                                            true,
+                                                                        subResulgeotaggingassignvillagelist![index]
+                                                                            .lableText
+                                                                            .toString(),
+                                                                        style: const TextStyle(
+                                                                            fontSize:
+                                                                                14,
+                                                                            fontWeight:
+                                                                                FontWeight.w500),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              SizedBox(
+                                                                width: 35,
+                                                                height: 80,
+                                                                child: Center(
+                                                                  child: CachedNetworkImage(
+                                                                      cacheManager:
+                                                                          customCacheManager,
+                                                                      key:
+                                                                          UniqueKey(),
+                                                                      imageUrl: subResulgeotaggingassignvillagelist![
+                                                                              index]
+                                                                          .icon
+                                                                          .toString(),
+                                                                      fit: BoxFit
+                                                                          .fill,
+                                                                      progressIndicatorBuilder: (context, url, downloadProgress) => Transform.scale(
+                                                                          scale:
+                                                                              .4,
+                                                                          child: CircularProgressIndicator(
+                                                                              value: downloadProgress
+                                                                                  .progress)),
+                                                                      errorWidget: (context,
+                                                                              url,
+                                                                              error) =>
+                                                                          const Icon(
+                                                                              Icons.image)),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
                                                 ),
+                                              ),
+                                        const SizedBox(
+                                          height: 10,
+                                        ),
+                                        schemeinfosubheading == null
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10, right: 10),
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: Text(
+                                                    schemeinfosubheading,
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color: Colors.blue,
+                                                        fontSize: 20),
+                                                  ),
+                                                ),
+                                              ),
+                                        subResulgeotaggingassignvillageschemelist!
+                                                .isEmpty
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding:
+                                                    const EdgeInsets.all(5),
+                                                child: GridView.builder(
+                                                  physics:
+                                                      const NeverScrollableScrollPhysics(),
+                                                  shrinkWrap: true,
+                                                  gridDelegate:
+                                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 2,
+                                                    childAspectRatio:
+                                                        (340.0 / 230.0),
+                                                    mainAxisSpacing: 4.0,
+                                                    crossAxisSpacing: 4.0,
+                                                  ),
+                                                  itemCount:
+                                                      subResulgeotaggingassignvillageschemelist!
+                                                          .length,
+                                                  itemBuilder:
+                                                      (context, index) {
+                                                    return Container(
+                                                      margin:
+                                                          const EdgeInsets.all(
+                                                              0),
+                                                      decoration: BoxDecoration(
+                                                        color: Appcolor.white,
+                                                        border: Border.all(
+                                                          color: Appcolor.white,
+                                                          width: 1,
+                                                        ),
+                                                        borderRadius:
+                                                            const BorderRadius
+                                                                .all(
+                                                          Radius.circular(
+                                                            10.0,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      child: Material(
+                                                        elevation: 2.0,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10.0),
+                                                        child: InkWell(
+                                                          splashColor: Appcolor
+                                                              .splashcolor,
+                                                          customBorder:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10.0),
+                                                          ),
+                                                          onTap: () {},
+                                                          child: Row(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .spaceBetween,
+                                                            children: [
+                                                              Column(
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .start,
+                                                                children: [
+                                                                  Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            4.0),
+                                                                    child: Text(
+                                                                      subResulgeotaggingassignvillageschemelist![
+                                                                              index]
+                                                                          .lableValue
+                                                                          .toString(),
+                                                                      style: const TextStyle(
+                                                                          fontWeight: FontWeight
+                                                                              .w500,
+                                                                          fontSize:
+                                                                              20),
+                                                                    ),
+                                                                  ),
+                                                                  Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            5.0),
+                                                                    child:
+                                                                        SizedBox(
+                                                                      width: 90,
+                                                                      child:
+                                                                          Text(
+                                                                        maxLines:
+                                                                            3,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        softWrap:
+                                                                            true,
+                                                                        subResulgeotaggingassignvillageschemelist![index]
+                                                                            .lableText
+                                                                            .toString(),
+                                                                        style: const TextStyle(
+                                                                            fontSize:
+                                                                                15,
+                                                                            fontWeight:
+                                                                                FontWeight.w500),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              SizedBox(
+                                                                height: 80,
+                                                                width: 40,
+                                                                child: Center(
+                                                                  child: CachedNetworkImage(
+                                                                      cacheManager:
+                                                                          customCacheManager,
+                                                                      key:
+                                                                          UniqueKey(),
+                                                                      imageUrl: subResulgeotaggingassignvillageschemelist![
+                                                                              index]
+                                                                          .icon
+                                                                          .toString(),
+                                                                      fit: BoxFit
+                                                                          .fill,
+                                                                      progressIndicatorBuilder: (context, url, downloadProgress) => Transform.scale(
+                                                                          scale:
+                                                                              .4,
+                                                                          child: CircularProgressIndicator(
+                                                                              value: downloadProgress
+                                                                                  .progress)),
+                                                                      errorWidget: (context,
+                                                                              url,
+                                                                              error) =>
+                                                                          const Icon(
+                                                                              Icons.image)),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                        const SizedBox(
+                                          height: 10,
+                                        ),
+                                        subheadingotherscemeasset == null
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10, right: 10),
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: Text(
+                                                    subheadingotherscemeasset,
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color: Colors.blue,
+                                                        fontSize: 20),
+                                                  ),
+                                                ),
+                                              ),
+                                        subResult_utherassetslist!.length ==
+                                                null
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding:
+                                                    const EdgeInsets.all(5),
+                                                child: GridView.builder(
+                                                  physics:
+                                                      const NeverScrollableScrollPhysics(),
+                                                  shrinkWrap: true,
+                                                  gridDelegate:
+                                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 2,
+                                                    childAspectRatio:
+                                                        (320.0 / 220.0),
+                                                    mainAxisSpacing: 3.0,
+                                                    crossAxisSpacing: 3.0,
+                                                  ),
+                                                  itemCount:
+                                                      subResult_utherassetslist!
+                                                          .length,
+                                                  itemBuilder:
+                                                      (context, index) {
+                                                    return Container(
+                                                      margin:
+                                                          const EdgeInsets.all(
+                                                              0),
+                                                      decoration: BoxDecoration(
+                                                        color: Appcolor.white,
+                                                        border: Border.all(
+                                                          color: Appcolor.white,
+                                                          width: 1,
+                                                        ),
+                                                        borderRadius:
+                                                            const BorderRadius
+                                                                .all(
+                                                          Radius.circular(
+                                                            10.0,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      child: Material(
+                                                        elevation: 2.0,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10.0),
+                                                        child: InkWell(
+                                                          splashColor: Appcolor
+                                                              .splashcolor,
+                                                          customBorder:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10.0),
+                                                          ),
+                                                          onTap: () {},
+                                                          child: Row(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Column(
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .start,
+                                                                children: [
+                                                                  Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            8.0),
+                                                                    child: Text(
+                                                                      subResult_utherassetslist![
+                                                                              index]
+                                                                          .lableValue
+                                                                          .toString(),
+                                                                      style: const TextStyle(
+                                                                          fontWeight: FontWeight
+                                                                              .w500,
+                                                                          fontSize:
+                                                                              20),
+                                                                    ),
+                                                                  ),
+                                                                  Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            2.0),
+                                                                    child:
+                                                                        SizedBox(
+                                                                      width:
+                                                                          110,
+                                                                      child:
+                                                                          Text(
+                                                                        maxLines:
+                                                                            3,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        softWrap:
+                                                                            true,
+                                                                        subResult_utherassetslist![index]
+                                                                            .lableText
+                                                                            .toString(),
+                                                                        style: const TextStyle(
+                                                                            fontSize:
+                                                                                15,
+                                                                            fontWeight:
+                                                                                FontWeight.w500),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              SizedBox(
+                                                                width: 45,
+                                                                height: 80,
+                                                                child: Center(
+                                                                  child: CachedNetworkImage(
+                                                                      cacheManager:
+                                                                          customCacheManager,
+                                                                      key:
+                                                                          UniqueKey(),
+                                                                      imageUrl: subResult_utherassetslist![
+                                                                              index]
+                                                                          .icon
+                                                                          .toString(),
+                                                                      fit: BoxFit
+                                                                          .fill,
+                                                                      progressIndicatorBuilder: (context, url, downloadProgress) => Transform.scale(
+                                                                          scale:
+                                                                              .4,
+                                                                          child: CircularProgressIndicator(
+                                                                              value: downloadProgress
+                                                                                  .progress)),
+                                                                      errorWidget: (context,
+                                                                              url,
+                                                                              error) =>
+                                                                          const Icon(
+                                                                              Icons.image)),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                        const SizedBox(
+                                          height: 5,
+                                        ),
+                                        const SizedBox(
+                                          height: 12,
+                                        ),
+                                        villagenotcertified == null
+                                            ? const SizedBox()
+                                            : Container(
+                                                margin: const EdgeInsets.all(5),
+                                                height: 45,
+                                                width: double.infinity,
+                                                padding:
+                                                    const EdgeInsets.all(5.0),
+                                                decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFF0B2E7C),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8)),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.all(8.0),
+                                                  child: Align(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: Text(
+                                                        villagenotcertified,
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            fontSize: 16,
+                                                            color:
+                                                                Colors.white),
+                                                      )),
+                                                ),
+                                              ),
+                                        const SizedBox(
+                                          height: 10,
+                                        ),
+                                        downloadsampleone == null
+                                            ? const SizedBox()
+                                            : Container(
+                                                margin: const EdgeInsets.all(5),
+                                                height: 55,
+                                                width: double.infinity,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10)),
+                                                child: TextButton(
+                                                  onPressed: () {},
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      CircleAvatar(
+                                                        radius: 20,
+                                                        child: IconButton(
+                                                          color: Colors.orange,
+                                                          onPressed: () {},
+                                                          icon: const Icon(
+                                                            Icons
+                                                                .download_rounded,
+                                                            size: 20,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                        width: 5,
+                                                      ),
+                                                      downloadsampleone == null
+                                                          ? const SizedBox()
+                                                          : SizedBox(
+                                                              width: 200,
+                                                              child: Text(
+                                                                downloadsampleone
+                                                                    .toString(),
+                                                                maxLines: 3,
+                                                                style:
+                                                                    const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                  color: Colors
+                                                                      .black,
+                                                                  fontSize:
+                                                                      14.0,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                        const SizedBox(
+                                          height: 5,
+                                        ),
+                                        downloadsmapletwo == null
+                                            ? const SizedBox()
+                                            : GestureDetector(
                                                 onTap: () {},
-                                                child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
+                                                child: Container(
+                                                  margin: const EdgeInsets.only(
+                                                      left: 5,
+                                                      top: 5,
+                                                      bottom: 5,
+                                                      right: 5),
+                                                  height: 55,
+                                                  width: double.infinity,
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10)),
+                                                  child: TextButton(
+                                                    onPressed: () {},
+                                                    child: Row(
                                                       mainAxisAlignment:
                                                           MainAxisAlignment
                                                               .start,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .center,
                                                       children: [
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(8.0),
-                                                          child: Text(
-                                                            villagenotcertifiedlist![
-                                                                    index]
-                                                                .lableValue
-                                                                .toString(),
-                                                            style: const TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                fontSize: 16),
+                                                        CircleAvatar(
+                                                          radius: 20,
+                                                          child: IconButton(
+                                                            color:
+                                                                Colors.orange,
+                                                            onPressed: () {},
+                                                            icon: const Icon(
+                                                              Icons
+                                                                  .download_rounded,
+                                                              size: 20,
+                                                            ),
                                                           ),
                                                         ),
+                                                        const SizedBox(
+                                                          width: 5,
+                                                        ),
                                                         SizedBox(
-                                                          width: 92,
-                                                          child: Padding(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .all(8.0),
-                                                            child: Text(
-                                                              villagenotcertifiedlist![
-                                                                      index]
-                                                                  .lableText
-                                                                  .toString(),
-                                                              maxLines: 4,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              softWrap: true,
-                                                              style: const TextStyle(
-                                                                  fontSize: 10,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500),
+                                                          width: 200,
+                                                          child: Text(
+                                                            downloadsmapletwo
+                                                                .toString(),
+                                                            maxLines: 3,
+                                                            style:
+                                                                const TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
+                                                              color:
+                                                                  Colors.black,
+                                                              fontSize: 14.0,
                                                             ),
                                                           ),
                                                         ),
                                                       ],
                                                     ),
-                                                    SizedBox(
-                                                      width: 50,
-                                                      height: 90,
-                                                      child: Center(
-                                                        child:
-                                                            villagenotcertifiedlist![index]
-                                                                        .icon
-                                                                        .toString() ==
-                                                                    null
-                                                                ? const SizedBox()
-                                                                : CachedNetworkImage(
-                                                                    cacheManager:
-                                                                        customCacheManager,
-                                                                    key:
-                                                                        UniqueKey(),
-                                                                    imageUrl: villagenotcertifiedlist![
-                                                                            index]
-                                                                        .icon
-                                                                        .toString(),
-                                                                    fit: BoxFit
-                                                                        .fill,
-                                                                    progressIndicatorBuilder: (context, url, downloadProgress) => Transform.scale(
-                                                                        scale:
-                                                                            .4,
-                                                                        child: CircularProgressIndicator(
-                                                                            value: downloadProgress
-                                                                                .progress)),
-                                                                    errorWidget: (context,
-                                                                            url,
-                                                                            error) =>
-                                                                        const Icon(
-                                                                            Icons.image)),
-                                                      ),
-                                                    ),
-                                                  ],
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 10,
-                                    ),
-                                    subHeading_desingtion==null ? SizedBox() : Padding(
-                                      padding: const EdgeInsets.only(
-                                          left: 10, right: 10),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          subHeading_desingtion.toString(),
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.blue,
-                                              fontSize: 16),
+                                        const SizedBox(
+                                          height: 10,
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 10,
-                                    ),
-                                    ListView.builder(
-                                        itemCount:
-                                            subresultdesinationlist!.length,
-                                        shrinkWrap: true,
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        itemBuilder: (context, int index) {
-                                          return GestureDetector(
-                                            onTap: () {},
-                                            child: Container(
-                                              margin: const EdgeInsets.only(
-                                                  bottom: 10,
-                                                  left: 5,
-                                                  right: 5),
-                                              height: 55,
-                                              width: double.infinity,
-                                              alignment: Alignment.center,
-                                              decoration: BoxDecoration(
-                                                  color: Colors.white,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10)),
-                                              child: TextButton(
-                                                onPressed: () {},
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.start,
-                                                  children: [
-                                                    CircleAvatar(
-                                                      backgroundColor:
-                                                          const Color(
-                                                              0xFF0D3A98),
-                                                      minRadius: 20,
-                                                      maxRadius: 20,
-                                                      child: IconButton(
-                                                        color: Colors.white,
-                                                        onPressed: () {
-                                                          Get.to(AssignedVillage(
-                                                              dbuserid: userid,
-                                                              userid:
-                                                                  widget.userid,
-                                                              usertoken: widget
-                                                                  .usertoken,
-                                                              stateid: widget
-                                                                  .stateid));
-                                                        },
-                                                        icon: const Icon(
-                                                          Icons.add,
-                                                          size: 20,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(
-                                                      width: 10,
-                                                    ),
-                                                    Text(
-                                                      subresultdesinationlist![
-                                                              index]
-                                                          .lableText
-                                                          .toString(),
-                                                      style: const TextStyle(
+                                        subheadingvillage == null
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10, right: 10),
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: Text(
+                                                    subheadingvillage
+                                                        .toString(),
+                                                    style: const TextStyle(
                                                         fontWeight:
                                                             FontWeight.w500,
-                                                        color: Colors.black,
-                                                        fontSize: 15.0,
-                                                      ),
-                                                    ),
-                                                  ],
+                                                        color: Colors.blue,
+                                                        fontSize: 16),
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          );
-                                        })
-                                  ]),
-                                ),
-                              ),
-                            ]),
-                      ],
-                    )))),
-    );
-  }
-
-// offlinescfreen
-  Widget OfflineScreenDatabase(BuildContext context) {
-    return Container(
-        height: MediaQuery.of(context).size.height,
-        width: MediaQuery.of(context).size.width,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-              image: AssetImage('images/header_bg.png'), fit: BoxFit.cover),
-        ),
-        child: SingleChildScrollView(
-            child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Column(children: [
-              Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 60,
-                          height: 60,
-                          child: Image.asset(
-                            'images/bharat.png',
-                            // Replace with your logo file path
-                            width: 60,
-                            // Adjust width and height as needed
-                            height: 60,
-                          ),
-                        ),
-                        Container(
-                          child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Jal Jeevan Mission',
-                                maxLines: 3,
-                                style: TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                maxLines: 3,
-                                'Department of Drinking Water and Sanitation',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              Text(
-                                'Ministry of Jal Shakti',
-                                style: TextStyle(
-                                    color: Colors.black, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    InkWell(
-                      onTap: () {
-                        showDialog(
-                            context: context,
-                            builder: (context) {
-                              return Container(
-                                padding: const EdgeInsets.only(top: 50),
-                                child: AlertDialog(
-                                  title: const Text('FE_dhubri'),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () {},
-                                        child: const Text('Sign Out'))
-                                  ],
-                                ),
-                              );
-                            });
-                      },
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20.0),
-                        child: Image.asset('images/profile.png',
-                            width: 50.0, height: 50.0),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(
-                height: 10,
-              ),
-              Container(
-                margin: const EdgeInsets.all(10),
-                child: Container(
-                  margin: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    //4b0082
-                    color: Appcolor.white,
-                    border: Border.all(
-                      color: Appcolor.white,
-                      width: 1,
-                    ),
-                    borderRadius: const BorderRadius.all(
-                      Radius.circular(
-                        10.0,
-                      ), //                 <--- border radius here
-                    ),
-                  ),
-
-                  //   color: Colors.white.withOpacity(0.10),
-                  child: SizedBox(
-                      width: double.infinity,
-                      child: Container(
-                        padding: const EdgeInsets.all(5.0),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  child: Image.asset(
-                                    "images/profile.png",
-                                    // Replace with your logo file path
-                                    width: 60,
-                                    // Adjust width and height as needed
-                                    height: 60,
-                                  ),
-                                ),
-                                const SizedBox(
-                                  width: 20,
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      username.toString(),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 14,
-                                          color: Colors.red),
-                                    ),
-                                    // Text("designation",style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),),
-                                    SizedBox(
-                                      width: 200,
-                                      child: Text(
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                        UserDescription.toString(),
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: Colors.blue),
-                                      ),
-                                    ),
-                                    //Text("dd" -""("stateName")',style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14,color: Colors.blue),),
-                                  ],
-                                )
-                              ],
-                            ),
-                            const SizedBox(
-                              height: 10,
-                            ),
-                            Container(
-                                padding: const EdgeInsets.all(10),
-                                // height: 45,
-                                decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: ScrollConfiguration(
-                                  behavior: const ScrollBehavior()
-                                      .copyWith(overscroll: false),
-                                  child: ListView.builder(
-                                      // itemCount:responsede?.result.length,
-                                      itemCount: subResult!.length,
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      itemBuilder: (context, int index) {
-                                        return Row(children: [
-                                          const Icon(
-                                            Icons.radio_button_checked,
-                                            size: 20,
-                                            color: Colors.orange,
-                                          ),
-                                          const SizedBox(
-                                            width: 10,
-                                          ),
-                                          Text(
-                                            "${subResult![index].lableText} : ${subResult![index].lableValue}",
-
-                                            // mapResponseone2[index]["LableText"].toString(),
-                                            //mapResponseone2[index]["LableText"].toString(),
-                                            // responsede!.result[index].heading,
-                                            style: const TextStyle(
-                                                color: Appcolor.black,
-                                                fontWeight: FontWeight.w500),
-                                          )
-                                        ]);
-                                      }),
-                                ))
-                          ],
-                        ),
-                      )),
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  //4b0082
-                  color: Appcolor.white,
-                  border: Border.all(
-                    color: Appcolor.white,
-                    width: 1,
-                  ),
-                  borderRadius: const BorderRadius.all(
-                    Radius.circular(
-                      10.0,
-                    ), //                 <--- border radius here
-                  ),
-                ),
-                child: Column(children: [
-                  Container(
-                    margin: const EdgeInsets.all(10),
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(5.0),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF0B2E7C),
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            mainHeadingmenuwatersuipply,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
-                                color: Colors.white),
-                          )),
-                    ),
-                  ),
-                  Padding(
-                    padding:
-                        const EdgeInsets.only(left: 10, right: 10, top: 10),
-                    child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          watersupplyheading,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: Colors.blue,
-                              fontSize: 16),
-                        )),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        // number of items in each row
-                        mainAxisSpacing: 5.0,
-                        // spacing between rows
-                        crossAxisSpacing: 5.0,
-                        childAspectRatio:
-                            (340.0 / 220.0), // spacing between columns
-                      ),
-                      // padding around the grid
-                      itemCount: subResultofstatusewatersupply!.length,
-                      // total number of items
-                      itemBuilder: (context, index) {
-                        return Container(
-                          margin: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            //4b0082
-                            color: Appcolor.white,
-                            border: Border.all(
-                              color: Appcolor.white,
-                              width: 1,
-                            ),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(
-                                10.0,
-                              ), //                 <--- border radius here
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      subResultofstatusewatersupply![index]
-                                          .lableValue
-                                          .toString(),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 16),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 90,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(
-                                        subResultofstatusewatersupply![index]
-                                            .lableText
-                                            .toString(),
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                        softWrap: true,
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                width: 50,
-                                height: 90,
-                                child: Center(
-                                  child:
-                                      subResultofstatusewatersupply![index]
-                                                  .icon
-                                                  .toString() ==
-                                              null
-                                          ? const SizedBox()
-                                          :
-                                          CachedNetworkImage(
-                                              cacheManager: customCacheManager,
-                                              key: UniqueKey(),
-                                              imageUrl:
-                                                  subResultofstatusewatersupply![
-                                                          index]
-                                                      .icon
-                                                      .toString(),
-                                              fit: BoxFit.fill,
-                                              progressIndicatorBuilder: (context,
-                                                      url, downloadProgress) =>
-                                                  Transform.scale(
-                                                      scale: .4,
-                                                      child: CircularProgressIndicator(
-                                                          value:
-                                                              downloadProgress
-                                                                  .progress)),
-                                              errorWidget:
-                                                  (context, url, error) =>
-                                                      const Icon(Icons.image)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 10,
-                  ),
-
-                  // Status of GeoTagging in assigned villages
-                  Container(
-                    margin: const EdgeInsets.all(10),
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(5.0),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF0B2E7C),
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            mainHeadingmenugeotagging.toString(),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
-                                color: Colors.white),
-                          )),
-                    ),
-                  ),
-                  Padding(
-                    padding:
-                        const EdgeInsets.only(left: 10, right: 10, top: 10),
-                    child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          pwsSubHeading,
-                          //       subheadinggeotag_pwssource,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: Colors.blue,
-                              fontSize: 16),
-                        )),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        // number of items in each row
-                        mainAxisSpacing: 5.0,
-                        // spacing between rows
-                        crossAxisSpacing: 5.0,
-                        childAspectRatio: (340.0 / 220.0),
-                        // spacing between columns
-                      ),
-                      // padding around the grid
-                      itemCount: subResulgeotaggingassignvillagelist!.length,
-                      // total number of items
-                      itemBuilder: (context, index) {
-                        return Container(
-                          margin: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            //4b0082
-                            color: Appcolor.white,
-                            border: Border.all(
-                              color: Appcolor.white,
-                              width: 1,
-                            ),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(
-                                10.0,
-                              ), //                 <--- border radius here
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      subResulgeotaggingassignvillagelist![
-                                              index]
-                                          .lableValue
-                                          .toString(),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 16),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 90,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                        softWrap: true,
-                                        subResulgeotaggingassignvillagelist![
-                                                index]
-                                            .lableText
-                                            .toString(),
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                height: 90,
-                                width: 50,
-                                child: Center(
-                                  child:
-                                      CachedNetworkImage(
-                                          cacheManager: customCacheManager,
-                                          key: UniqueKey(),
-                                          imageUrl:
-                                              subResulgeotaggingassignvillagelist![
-                                                      index]
-                                                  .icon
-                                                  .toString(),
-                                          fit: BoxFit.fill,
-                                          progressIndicatorBuilder: (context,
-                                                  url, downloadProgress) =>
-                                              Transform.scale(
-                                                  scale: .4,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                          value:
-                                                              downloadProgress
-                                                                  .progress)),
-                                          errorWidget: (context, url, error) =>
-                                              const Icon(Icons.image)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 20,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10, right: 10),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        schemeinfosubheading,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: Colors.blue,
-                            fontSize: 16),
-                      ),
-                    ),
-                  ),
-
-                  // third gridview
-                  Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: (340.0 / 220.0),
-                        // number of items in each row
-                        mainAxisSpacing: 5.0,
-                        // spacing between rows
-                        crossAxisSpacing: 5.0, // spacing between columns
-                      ),
-                      // padding around the grid
-                      itemCount:
-                          subResulgeotaggingassignvillageschemelist!.length,
-                      // total number of items
-                      itemBuilder: (context, index) {
-                        return Container(
-                          margin: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            //4b0082
-                            color: Appcolor.white,
-                            border: Border.all(
-                              color: Appcolor.white,
-                              width: 1,
-                            ),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(
-                                10.0,
-                              ), //                 <--- border radius here
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      subResulgeotaggingassignvillageschemelist![
-                                              index]
-                                          .lableValue
-                                          .toString(),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 16),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(5.0),
-                                    child: SizedBox(
-                                      width: 80,
-                                      child: Text(
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                        softWrap: true,
-                                        subResulgeotaggingassignvillageschemelist![
-                                                index]
-                                            .lableText
-                                            .toString(),
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                width: 50,
-                                height: 90,
-                                child: Center(
-                                  child:
-                                      CachedNetworkImage(
-                                          cacheManager: customCacheManager,
-                                          key: UniqueKey(),
-                                          imageUrl:
-                                              subResulgeotaggingassignvillageschemelist![
-                                                      index]
-                                                  .icon
-                                                  .toString(),
-                                          fit: BoxFit.fill,
-                                          progressIndicatorBuilder: (context,
-                                                  url, downloadProgress) =>
-                                              Transform.scale(
-                                                  scale: .4,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                          value:
-                                                              downloadProgress
-                                                                  .progress)),
-                                          errorWidget: (context, url, error) =>
-                                              const Icon(Icons.image)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10, right: 10),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        subheadingotherscemeasset,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: Colors.blue,
-                            fontSize: 16),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: (340.0 / 220.0),
-                        // number of items in each row
-                        mainAxisSpacing: 5.0,
-                        // spacing between rows
-                        crossAxisSpacing: 5.0, // spacing between columns
-                      ),
-                      // padding around the grid
-                      itemCount: subResult_utherassetslist!.length,
-                      // total number of items
-                      itemBuilder: (context, index) {
-                        return Container(
-                          margin: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            //4b0082
-                            color: Appcolor.white,
-                            border: Border.all(
-                              color: Appcolor.white,
-                              width: 1,
-                            ),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(
-                                10.0,
-                              ), //                 <--- border radius here
-                            ),
-                          ),
-                          child: Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(
-                                        subResult_utherassetslist![index]
-                                            .lableValue
-                                            .toString(),
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 16),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(5.0),
-                                      child: SizedBox(
-                                        width: 80,
-                                        child: Text(
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          softWrap: true,
-                                          subResult_utherassetslist![index]
-                                              .lableText
-                                              .toString(),
-                                          style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500),
+                                        villagenotcertifiedlist!.isEmpty
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding:
+                                                    const EdgeInsets.all(5),
+                                                child: GridView.builder(
+                                                  physics:
+                                                      const NeverScrollableScrollPhysics(),
+                                                  shrinkWrap: true,
+                                                  gridDelegate:
+                                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 2,
+                                                    mainAxisSpacing: 5.0,
+                                                    crossAxisSpacing: 5.0,
+                                                    childAspectRatio:
+                                                        (340.0 / 220.0),
+                                                  ),
+                                                  itemCount:
+                                                      villagenotcertifiedlist!
+                                                          .length,
+                                                  itemBuilder:
+                                                      (context, index) {
+                                                    return Container(
+                                                      margin:
+                                                          const EdgeInsets.all(
+                                                              0),
+                                                      decoration: BoxDecoration(
+                                                        color: Appcolor.white,
+                                                        border: Border.all(
+                                                          color: Appcolor.white,
+                                                          width: 1,
+                                                        ),
+                                                        borderRadius:
+                                                            const BorderRadius
+                                                                .all(
+                                                          Radius.circular(
+                                                            10.0,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      child: Material(
+                                                        elevation: 2.0,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10.0),
+                                                        child: InkWell(
+                                                          splashColor: Appcolor
+                                                              .splashcolor,
+                                                          customBorder:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10.0),
+                                                          ),
+                                                          onTap: () {},
+                                                          child: Row(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .spaceBetween,
+                                                            children: [
+                                                              Column(
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .start,
+                                                                children: [
+                                                                  Padding(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .all(
+                                                                            8.0),
+                                                                    child: Text(
+                                                                      villagenotcertifiedlist![
+                                                                              index]
+                                                                          .lableValue
+                                                                          .toString(),
+                                                                      style: const TextStyle(
+                                                                          fontWeight: FontWeight
+                                                                              .w500,
+                                                                          fontSize:
+                                                                              16),
+                                                                    ),
+                                                                  ),
+                                                                  SizedBox(
+                                                                    width: 92,
+                                                                    child:
+                                                                        Padding(
+                                                                      padding: const EdgeInsets
+                                                                          .all(
+                                                                          8.0),
+                                                                      child:
+                                                                          Text(
+                                                                        villagenotcertifiedlist![index]
+                                                                            .lableText
+                                                                            .toString(),
+                                                                        maxLines:
+                                                                            4,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        softWrap:
+                                                                            true,
+                                                                        style: const TextStyle(
+                                                                            fontSize:
+                                                                                10,
+                                                                            fontWeight:
+                                                                                FontWeight.w500),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              SizedBox(
+                                                                width: 50,
+                                                                height: 90,
+                                                                child: Center(
+                                                                  child: villagenotcertifiedlist![index]
+                                                                              .icon
+                                                                              .toString() ==
+                                                                          null
+                                                                      ? const SizedBox()
+                                                                      : CachedNetworkImage(
+                                                                          cacheManager:
+                                                                              customCacheManager,
+                                                                          key:
+                                                                              UniqueKey(),
+                                                                          imageUrl: villagenotcertifiedlist![index]
+                                                                              .icon
+                                                                              .toString(),
+                                                                          fit: BoxFit
+                                                                              .fill,
+                                                                          progressIndicatorBuilder: (context, url, downloadProgress) => Transform.scale(
+                                                                              scale: .4,
+                                                                              child: CircularProgressIndicator(value: downloadProgress.progress)),
+                                                                          errorWidget: (context, url, error) => const Icon(Icons.image)),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                        const SizedBox(
+                                          height: 10,
                                         ),
-                                      ),
+                                        subHeading_desingtion == null
+                                            ? const SizedBox()
+                                            : Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 10, right: 10),
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: Text(
+                                                    subHeading_desingtion
+                                                        .toString(),
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color: Colors.blue,
+                                                        fontSize: 16),
+                                                  ),
+                                                ),
+                                              ),
+                                        const SizedBox(
+                                          height: 10,
+                                        ),
+                                        ListView.builder(
+                                            itemCount:
+                                                subresultdesinationlist!.length,
+                                            shrinkWrap: true,
+                                            physics:
+                                                const NeverScrollableScrollPhysics(),
+                                            itemBuilder: (context, int index) {
+                                              return GestureDetector(
+                                                onTap: () {},
+                                                child: Container(
+                                                  margin: const EdgeInsets.only(
+                                                      bottom: 10,
+                                                      left: 5,
+                                                      right: 5),
+                                                  height: 55,
+                                                  width: double.infinity,
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10)),
+                                                  child: TextButton(
+                                                    onPressed: () {},
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        CircleAvatar(
+                                                          backgroundColor:
+                                                              const Color(
+                                                                  0xFF0D3A98),
+                                                          minRadius: 20,
+                                                          maxRadius: 20,
+                                                          child: IconButton(
+                                                            color: Colors.white,
+                                                            onPressed: () {},
+                                                            icon: const Icon(
+                                                              Icons.add,
+                                                              size: 20,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 10,
+                                                        ),
+                                                        Text(
+                                                          subresultdesinationlist![
+                                                                  index]
+                                                              .lableText
+                                                              .toString(),
+                                                          style:
+                                                              const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            color: Colors.black,
+                                                            fontSize: 15.0,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            })
+                                      ]),
                                     ),
-                                  ],
-                                ),
-                                SizedBox(
-                                  width: 50,
-                                  height: 90,
-                                  child: Center(
-                                    child:
-                                        CachedNetworkImage(
-                                            cacheManager: customCacheManager,
-                                            key: UniqueKey(),
-                                            imageUrl:
-                                                subResult_utherassetslist![
-                                                        index]
-                                                    .icon
+                                  ),
+                                ]),
+                          ],
+                        )),
+                ),
+                Positioned(
+                  left: fabPosition.dx
+                      .clamp(0.0, MediaQuery.of(context).size.width - 56),
+                  top: fabPosition.dy
+                      .clamp(0.0, MediaQuery.of(context).size.height - 56),
+                  child: GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        fabPosition += details.delta;
+                        fabPosition = Offset(
+                          fabPosition.dx.clamp(
+                              0.0, MediaQuery.of(context).size.width - 56),
+                          fabPosition.dy.clamp(
+                              0.0, MediaQuery.of(context).size.height - 56),
+                        );
+                      });
+                    },
+                    child: Container(
+                      child: FloatingActionButton(
+                          backgroundColor: Appcolor.btncolor,
+                          child: floatingloader == true
+                              ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator())
+                              : const Icon(Icons.refresh, color: Colors.white),
+                          onPressed: () async {
+                            if (!_isButtonDisabled) {
+                              setState(() {
+                                _isButtonDisabled = true;
+                                _hasButtonBeenClicked = true;
+                              });
+                              Timer(const Duration(seconds: 3), () {
+                                setState(() {
+                                  floatingloader = false;
+                                  _isButtonDisabled = false;
+                                });
+                              });
+                              try {
+                                final result =
+                                    await InternetAddress.lookup('example.com');
+                                if (result.isNotEmpty &&
+                                    result[0].rawAddress.isNotEmpty) {
+                                  cleartable_localmastertables();
+                                  doSomeAsyncStuff().then((value) {
+                                    floatingloader = true;
+                                  });
+
+                                  Apiservice.Getmasterapi(context)
+                                      .then((value) {
+                                    databaseHelperJalJeevan!
+                                        .insertMasterapidatetime(
+                                            Localmasterdatetime(
+                                                UserId: box
+                                                    .read("userid")
                                                     .toString(),
-                                            fit: BoxFit.fill,
-                                            progressIndicatorBuilder: (context,
-                                                    url, downloadProgress) =>
-                                                Transform.scale(
-                                                    scale: .4,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                            value:
-                                                                downloadProgress
-                                                                    .progress)),
-                                            errorWidget:
-                                                (context, url, error) =>
-                                                    const Icon(Icons.image)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      //Navigator.pushNamed(context, 'assignedvillage');
-                      Get.to(AssignedVillage(
-                          dbuserid: userid,
-                          userid: widget.userid,
-                          usertoken: widget.usertoken,
-                          stateid: widget.stateid));
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.all(10),
-                      height: 55,
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Add/ Geo-tag PWS assets',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
-                              fontSize: 18.0,
-                            ),
-                          ),
-                          CircleAvatar(
-                            backgroundColor: const Color(0xFF0D3A98),
-                            minRadius: 20,
-                            maxRadius: 20,
-                            child: IconButton(
-                              color: Colors.white,
-                              onPressed: () {
-                                Get.to(AssignedVillage(
-                                    dbuserid: userid,
-                                    userid: widget.userid,
-                                    usertoken: widget.usertoken,
-                                    stateid: widget.stateid));
+                                                API_DateTime: value.API_DateTime
+                                                    .toString()));
 
-                                //  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => Assigned_village(widget.userId, widget.stateid, widget.token )));// Do something with mapResponse here...
-                              },
-                              icon: const Icon(
-                                Icons.add,
-                                size: 25,
-                              ),
-                            ),
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                  villagenotcertified.toString()== null ? SizedBox() :      Container(
-                    margin: const EdgeInsets.all(10),
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(5.0),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF0B2E7C),
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            villagenotcertified.toString(),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
-                                color: Colors.white),
-                          )),
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 10,
-                  ),
-                  downloadsampleone == null ?  SizedBox() : GestureDetector(
-                    onTap: () {
-                      //Navigator.pushNamed(context, 'assignedvillage');
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.all(10),
-                      height: 55,
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20)),
-                      child: TextButton(
-                        onPressed: () {},
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            //SubHeadingHGJv illagecertificate
-                            // hjgcertificatedownloadlist
-                            CircleAvatar(
-                              radius: 20,
-                              child: IconButton(
-                                color: Colors.orange,
-                                onPressed: () {
-                                  //Get.to(AssignedVilllage(userid:widget.userid, usertoken:widget.usertoken , stateid: widget.stateid ));
-                                  //  Get.to(AssignedVillage());
-                                  //  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => Assigned_village(widget.userId, widget.stateid, widget.token )));// Do something with mapResponse here...
-                                },
-                                icon: const Icon(
-                                  Icons.download_rounded,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(
-                              width: 10,
-                            ),
-                            SizedBox(
-                              width: 200,
-                              child: Text(
-                                downloadsampleone.toString(),
-                                maxLines: 3,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                  fontSize: 14.0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 0,
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      //Navigator.pushNamed(context, 'assignedvillage');
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(
-                          left: 10, top: 10, bottom: 10, right: 10),
-                      height: 55,
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20)),
-                      child: TextButton(
-                        onPressed: () {},
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            //SubHeadingHGJv illagecertificate
-                            // hjgcertificatedownloadlist
-                            CircleAvatar(
-                              radius: 20,
-                              child: IconButton(
-                                color: Colors.orange,
-                                onPressed: () {},
-                                icon: const Icon(
-                                  Icons.download_rounded,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(
-                              width: 10,
-                            ),
-                            SizedBox(
-                              width: 200,
-                              child: Text(
-                                downloadsmapletwo,
-                                maxLines: 3,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                  fontSize: 14.0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 10,
-                  ),
+                                    for (int i = 0;
+                                        i < value.villagelist!.length;
+                                        i++) {
+                                      var userid =
+                                          value.villagelist![i]!.userId;
 
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10, right: 10),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        subheadingvillage,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: Colors.blue,
-                            fontSize: 16),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        // number of items in each row
-                        mainAxisSpacing: 5.0,
-                        // spacing between rows
-                        crossAxisSpacing: 5.0,
-                        childAspectRatio:
-                            (340.0 / 220.0), // spacing between columns
-                      ),
-                      // padding around the grid
-                      itemCount: villagenotcertifiedlist!.length,
-                      // total number of items
-                      itemBuilder: (context, index) {
-                        return Container(
-                          margin: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            //4b0082
-                            color: Appcolor.white,
-                            border: Border.all(
-                              color: Appcolor.white,
-                              width: 1,
-                            ),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(
-                                10.0,
-                              ), //                 <--- border radius here
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      villagenotcertifiedlist![index]
-                                          .lableValue
-                                          .toString(),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 95,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(5.0),
-                                      child: Text(
-                                        villagenotcertifiedlist![index]
-                                            .lableText
-                                            .toString(),
-                                        maxLines: 4,
-                                        overflow: TextOverflow.ellipsis,
-                                        softWrap: true,
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                width: 50,
-                                height: 90,
-                                child: Center(
-                                  child:
-                                      villagenotcertifiedlist![index]
-                                                  .icon
-                                                  .toString() ==
-                                              "null"
-                                          ? const SizedBox()
-                                          :
-                                          CachedNetworkImage(
-                                              cacheManager: customCacheManager,
-                                              key: UniqueKey(),
-                                              imageUrl:
-                                                  villagenotcertifiedlist![
-                                                          index]
-                                                      .icon
-                                                      .toString(),
-                                              fit: BoxFit.fill,
-                                              progressIndicatorBuilder: (context,
-                                                      url, downloadProgress) =>
-                                                  Transform.scale(
-                                                      scale: .4,
-                                                      child: CircularProgressIndicator(
-                                                          value:
-                                                              downloadProgress
-                                                                  .progress)),
-                                              errorWidget:
-                                                  (context, url, error) =>
-                                                      const Icon(Icons.image)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                                      var villageId =
+                                          value.villagelist![i]!.villageId;
+                                      var stateId =
+                                          value.villagelist![i]!.stateId;
+                                      var villageName =
+                                          value.villagelist![i]!.VillageName;
 
-                  const SizedBox(
-                    height: 10,
-                  ),
-                  subHeading_desingtion==null  ? SizedBox() :  Padding(
-                    padding: const EdgeInsets.only(left: 10, right: 10),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        subHeading_desingtion,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: Colors.blue,
-                            fontSize: 16),
-                      ),
+                                      databaseHelperJalJeevan
+                                          ?.insertMastervillagelistdata(
+                                              Localmasterdatanodal(
+                                                  UserId: userid.toString(),
+                                                  villageId:
+                                                      villageId.toString(),
+                                                  StateId: stateId.toString(),
+                                                  villageName:
+                                                      villageName.toString()))
+                                          .then((value) {});
+                                    }
+                                    databaseHelperJalJeevan!
+                                        .removeDuplicateEntries();
+
+                                    for (int i = 0;
+                                        i < value.villageDetails!.length;
+                                        i++) {
+                                      var stateName = "Assam";
+
+                                      var districtName = value
+                                          .villageDetails![i]!.districtName;
+                                      var stateid =
+                                          value.villageDetails![i]!.stateId;
+                                      var blockName =
+                                          value.villageDetails![i]!.blockName;
+                                      var panchayatName = value
+                                          .villageDetails![i]!.panchayatName;
+                                      var stateidnew =
+                                          value.villageDetails![i]!.stateId;
+                                      var userId =
+                                          value.villageDetails![i]!.userId;
+                                      var villageIddetails =
+                                          value.villageDetails![i]!.villageId;
+                                      var villageName =
+                                          value.villageDetails![i]!.villageName;
+                                      var totalNoOfScheme = value
+                                          .villageDetails![i]!.totalNoOfScheme;
+                                      var totalNoOfWaterSource = value
+                                          .villageDetails![i]!
+                                          .totalNoOfWaterSource;
+                                      var totalWsGeoTagged = value
+                                          .villageDetails![i]!.totalWsGeoTagged;
+                                      var pendingWsTotal = value
+                                          .villageDetails![i]!.pendingWsTotal;
+                                      var balanceWsTotal = value
+                                          .villageDetails![i]!.balanceWsTotal;
+                                      var totalSsGeoTagged = value
+                                          .villageDetails![i]!.totalSsGeoTagged;
+                                      var pendingApprovalSsTotal = value
+                                          .villageDetails![i]!
+                                          .pendingApprovalSsTotal;
+                                      var totalIbRequiredGeoTagged = value
+                                          .villageDetails![i]!
+                                          .totalIbRequiredGeoTagged;
+                                      var totalIbGeoTagged = value
+                                          .villageDetails![i]!.totalIbGeoTagged;
+                                      var pendingIbTotal = value
+                                          .villageDetails![i]!.pendingIbTotal;
+                                      var balanceIbTotal = value
+                                          .villageDetails![i]!.balanceIbTotal;
+                                      var totalOaGeoTagged = value
+                                          .villageDetails![i]!.totalOaGeoTagged;
+                                      var balanceOaTotal = value
+                                          .villageDetails![i]!.balanceOaTotal;
+                                      var totalNoOfSchoolScheme = value
+                                          .villageDetails![i]!
+                                          .totalNoOfSchoolScheme;
+                                      var totalNoOfPwsScheme = value
+                                          .villageDetails![i]!
+                                          .totalNoOfPwsScheme;
+
+                                      databaseHelperJalJeevan
+                                          ?.insertMastervillagedetails(
+                                              Localmasterdatamodal_VillageDetails(
+                                        status: "0",
+                                        stateName: stateName,
+                                        districtName: districtName,
+                                        blockName: blockName,
+                                        panchayatName: panchayatName,
+                                        stateId: stateidnew.toString(),
+                                        userId: userId.toString(),
+                                        villageId: villageIddetails.toString(),
+                                        villageName: villageName,
+                                        totalNoOfScheme:
+                                            totalNoOfScheme.toString(),
+                                        totalNoOfWaterSource:
+                                            totalNoOfWaterSource.toString(),
+                                        totalWsGeoTagged:
+                                            totalWsGeoTagged.toString(),
+                                        pendingWsTotal:
+                                            pendingWsTotal.toString(),
+                                        balanceWsTotal:
+                                            balanceWsTotal.toString(),
+                                        totalSsGeoTagged:
+                                            totalSsGeoTagged.toString(),
+                                        pendingApprovalSsTotal:
+                                            pendingApprovalSsTotal.toString(),
+                                        totalIbRequiredGeoTagged:
+                                            totalIbRequiredGeoTagged.toString(),
+                                        totalIbGeoTagged:
+                                            totalIbGeoTagged.toString(),
+                                        pendingIbTotal:
+                                            pendingIbTotal.toString(),
+                                        balanceIbTotal:
+                                            balanceIbTotal.toString(),
+                                        totalOaGeoTagged:
+                                            totalOaGeoTagged.toString(),
+                                        balanceOaTotal:
+                                            balanceOaTotal.toString(),
+                                        totalNoOfSchoolScheme:
+                                            totalNoOfSchoolScheme.toString(),
+                                        totalNoOfPwsScheme:
+                                            totalNoOfPwsScheme.toString(),
+                                      ));
+                                    }
+
+                                    for (int i = 0;
+                                        i < value.schmelist!.length;
+                                        i++) {
+                                      var sourceType =
+                                          value.schmelist![i]!.source_type;
+                                      var schemeidnew =
+                                          value.schmelist![i]!.schemeid;
+                                      var villageid =
+                                          value.schmelist![i]!.villageId;
+                                      var schemenamenew =
+                                          value.schmelist![i]!.schemename;
+                                      var schemenacategorynew =
+                                          value.schmelist![i]!.category;
+                                      var SourceTypeCategoryId = value
+                                          .schmelist![i]!.SourceTypeCategoryId;
+                                      var sourceTypecategory = value
+                                          .schmelist![i]!.source_typeCategory;
+
+                                      databaseHelperJalJeevan
+                                          ?.insertMasterSchmelist(
+                                              Localmasterdatamoda_Scheme(
+                                        source_type: sourceType.toString(),
+                                        schemeid: schemeidnew.toString(),
+                                        villageId: villageid.toString(),
+                                        schemename: schemenamenew.toString(),
+                                        category:
+                                            schemenacategorynew.toString(),
+                                        SourceTypeCategoryId:
+                                            SourceTypeCategoryId.toString(),
+                                        source_typeCategory:
+                                            sourceTypecategory.toString(),
+                                      ));
+                                    }
+
+                                    for (int i = 0;
+                                        i < value.sourcelist!.length;
+                                        i++) {
+                                      var sourceId =
+                                          value.sourcelist![i]!.sourceId;
+                                      var SchemeId =
+                                          value.sourcelist![i]!.schemeId;
+                                      var stateid =
+                                          value.sourcelist![i]!.stateid;
+                                      var Schemename =
+                                          value.sourcelist![i]!.schemeName;
+                                      var villageid =
+                                          value.sourcelist![i]!.villageId;
+                                      var sourceTypeId =
+                                          value.sourcelist![i]!.sourceTypeId;
+                                      var statename =
+                                          value.sourcelist![i]!.stateName;
+                                      var sourceTypeCategoryId = value
+                                          .sourcelist![i]!.sourceTypeCategoryId;
+                                      var habitationId =
+                                          value.sourcelist![i]!.habitationId;
+                                      var villageName =
+                                          value.sourcelist![i]!.villageName;
+                                      var existTagWaterSourceId = value
+                                          .sourcelist![i]!
+                                          .existTagWaterSourceId;
+                                      var isApprovedState =
+                                          value.sourcelist![i]!.isApprovedState;
+                                      var landmark =
+                                          value.sourcelist![i]!.landmark;
+                                      var latitude =
+                                          value.sourcelist![i]!.latitude;
+                                      var longitude =
+                                          value.sourcelist![i]!.longitude;
+                                      var habitationName =
+                                          value.sourcelist![i]!.habitationName;
+                                      var location =
+                                          value.sourcelist![i]!.location;
+                                      var sourceTypeCategory = value
+                                          .sourcelist![i]!.sourceTypeCategory;
+                                      var sourceType =
+                                          value.sourcelist![i]!.sourceType;
+                                      var districtName =
+                                          value.sourcelist![i]!.districtName;
+                                      var districtId =
+                                          value.sourcelist![i]!.districtId;
+                                      var panchayatNamenew =
+                                          value.sourcelist![i]!.panchayatName;
+                                      var blocknamenew =
+                                          value.sourcelist![i]!.blockName;
+
+                                      databaseHelperJalJeevan
+                                          ?.insertMasterSourcedetails(
+                                              LocalSourcelistdetailsModal(
+                                        schemeId: SchemeId.toString(),
+                                        sourceId: sourceId.toString(),
+                                        villageId: villageid.toString(),
+                                        schemeName: Schemename,
+                                        sourceTypeId: sourceTypeId.toString(),
+                                        sourceTypeCategoryId:
+                                            sourceTypeCategoryId.toString(),
+                                        habitationId: habitationId.toString(),
+                                        existTagWaterSourceId:
+                                            existTagWaterSourceId.toString(),
+                                        isApprovedState:
+                                            isApprovedState.toString(),
+                                        landmark: landmark,
+                                        latitude: latitude.toString(),
+                                        longitude: longitude.toString(),
+                                        habitationName: habitationName,
+                                        location: location,
+                                        sourceTypeCategory: sourceTypeCategory,
+                                        sourceType: sourceType,
+                                        stateName: statename,
+                                        districtName: districtName,
+                                        blockName: blocknamenew,
+                                        panchayatName: panchayatNamenew,
+                                        districtId: districtId.toString(),
+                                        villageName: villageName,
+                                        stateId: stateid.toString(),
+                                      ));
+                                    }
+
+                                    for (int i = 0;
+                                        i < value.habitationlist!.length;
+                                        i++) {
+                                      var villafgeid =
+                                          value.habitationlist![i]!.villageId;
+                                      var habitationId = value
+                                          .habitationlist![i]!.habitationId;
+                                      var habitationName = value
+                                          .habitationlist![i]!.habitationName;
+
+                                      databaseHelperJalJeevan
+                                          ?.insertMasterhabitaionlist(
+                                              LocalHabitaionlistModal(
+                                                  villageId:
+                                                      villafgeid.toString(),
+                                                  HabitationId:
+                                                      habitationId.toString(),
+                                                  HabitationName: habitationName
+                                                      .toString()));
+                                    }
+                                    for (int i = 0;
+                                        i < value.informationBoardList!.length;
+                                        i++) {
+                                      databaseHelperJalJeevan?.insertmastersibdetails(LocalmasterInformationBoardItemModal(
+                                          userId: value
+                                              .informationBoardList![i]!.userId
+                                              .toString(),
+                                          villageId: value
+                                              .informationBoardList![i]!
+                                              .villageId
+                                              .toString(),
+                                          stateId: value
+                                              .informationBoardList![i]!.stateId
+                                              .toString(),
+                                          schemeId: value
+                                              .informationBoardList![i]!
+                                              .schemeId
+                                              .toString(),
+                                          districtName: value
+                                              .informationBoardList![i]!
+                                              .districtName,
+                                          blockName: value
+                                              .informationBoardList![i]!
+                                              .blockName,
+                                          panchayatName: value.informationBoardList![i]!.panchayatName,
+                                          villageName: value.informationBoardList![i]!.villageName,
+                                          habitationName: value.informationBoardList![i]!.habitationName,
+                                          latitude: value.informationBoardList![i]!.latitude.toString(),
+                                          longitude: value.informationBoardList![i]!.longitude.toString(),
+                                          sourceName: value.informationBoardList![i]!.sourceName,
+                                          schemeName: value.informationBoardList![i]!.schemeName,
+                                          message: value.informationBoardList![i]!.message,
+                                          status: value.informationBoardList![i]!.status.toString()));
+                                    }
+                                  });
+                                  setState(() {
+                                    floatingloader = false;
+                                  });
+                                  Stylefile.showmessageforvalidationtrue(
+                                      context,
+                                      "Master data downloaded successfully.");
+                                  DateTime currentTime = DateTime.now();
+                                }
+                              } on SocketException catch (_) {
+                                Stylefile.showmessageforvalidationfalse(context,
+                                    "Unable to Connect to the Internet. Please check your network settings.");
+                              }
+                            }
+                          }),
                     ),
                   ),
-                  const SizedBox(
-                    height: 10,
-                  ),
-                  subresultdesinationlist!.length==0 ? SizedBox() : ListView.builder(
-                      itemCount: subresultdesinationlist!.length,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemBuilder: (context, int index) {
-                        return GestureDetector(
-                          onTap: () {
-                            //Navigator.pushNamed(context, 'assignedvillage');
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.all(10),
-                            height: 55,
-                            width: double.infinity,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20)),
-                            child: TextButton(
-                              onPressed: () {},
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: const Color(0xFF0D3A98),
-                                    radius: 20,
-                                    child: IconButton(
-                                      color: Colors.white,
-                                      onPressed: () {
-                                        //Get.to(AssignedVilllage(userid:widget.userid, usertoken:widget.usertoken , stateid: widget.stateid ));
-                                        Get.to(AssignedVillage(
-                                            dbuserid: userid,
-                                            userid: widget.userid,
-                                            usertoken: widget.usertoken,
-                                            stateid: widget.stateid));
-
-                                        //  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => Assigned_village(widget.userId, widget.stateid, widget.token )));// Do something with mapResponse here...
-                                      },
-                                      icon: const Icon(
-                                        Icons.add,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(
-                                    width: 10,
-                                  ),
-                                  Text(
-                                    subresultdesinationlist![index]
-                                        .lableText
-                                        .toString(),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
-                                      fontSize: 15.0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                ]),
-              ),
-            ]),
-          ],
-        )));
+                ),
+              ],
+            )),
+      ),
+    );
   }
 
   Future<bool> showExitPopup() async {
     return await showDialog(
           context: context,
           builder: (context) => Container(
-            margin: const EdgeInsets.all(30),
-            child: AlertDialog(
-              titlePadding: const EdgeInsets.only(top: 20, left: 0, right: 5),
-              contentPadding:
-                  const EdgeInsets.only(top: 10, left: 0, right: 0, bottom: 20),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 10),
-              title: const Padding(
-                padding: EdgeInsets.only(left: 25, right: 20),
-                child: Text('Exit App'),
+              child: AlertDialog(
+            backgroundColor: Appcolor.white,
+            titlePadding: const EdgeInsets.only(top: 0, left: 0, right: 00),
+            buttonPadding: const EdgeInsets.all(10),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(
+                Radius.circular(
+                  5.0,
+                ),
               ),
-              content: const Padding(
-                padding: EdgeInsets.only(left: 25, right: 20),
-                child: Text('Are you sure want to exit?'),
-              ),
-              actions: [
-                Container(
-                  height: 40,
-                  color: Appcolor.btncolor,
-                  width: MediaQuery.of(context).size.width,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Appcolor.btncolor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(0.0),
-                            ),
-                          ),
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text(
-                            'No',
-                            style: TextStyle(color: Appcolor.white),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Appcolor.greenmessagecolor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(0.0),
-                            ),
-                          ),
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Yes',
-                              style: TextStyle(color: Appcolor.white)),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              ],
             ),
-          ),
+            actionsAlignment: MainAxisAlignment.center,
+            title: Container(
+              color: Appcolor.red,
+              child: const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "Jal jeevan mission",
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Appcolor.white),
+                  ),
+                ),
+              ),
+            ),
+            content: const SingleChildScrollView(
+              child: ListBody(
+                children: <Widget>[
+                  Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text(
+                      "Are you sure want to exit from this application ?",
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Appcolor.black),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              Container(
+                height: 40,
+                width: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(
+                    color: Appcolor.red,
+                    width: 1,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: TextButton(
+                  child: const Text(
+                    'No',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Appcolor.black),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+              Container(
+                height: 40,
+                width: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(
+                    color: Appcolor.red,
+                    width: 1,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: TextButton(
+                  child: const Text(
+                    'Yes',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Appcolor.black),
+                  ),
+                  onPressed: () async {
+                    SystemNavigator.pop();
+                  },
+                ),
+              ),
+            ],
+          )),
         ) ??
         false;
   }
+
+  var totalofflineupload;
+  int successfulUploadCount = 0;
+  int successfulUploadCountSIB = 0;
+  int successfulUploadCountSS = 0;
+
+  Future<void> Totaluploadofflineserver() async {
+    try {
+      await uploadLocalDataAndClear(context);
+      await uploadLocalDataAndClear_forsib(context);
+      await StoragestructureuploadLocalDataAndClear(context);
+      await OtherassetsuploadLocalDataAndClear(context);
+
+      if (uploadFunctionCalled == true) {
+        await clearAndFetchMasterData(context);
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> Totaluploadofflineserver_appupdatecase() async {
+    try {
+      await uploadLocalDataAndClear_forappupdatecase(context);
+      await uploadLocalDataAndClear_forsib_appupdatecase(context);
+      await StoragestructureuploadLocalDataAndClear_forappupdatecase(context);
+      await OtherassetsuploadLocalDataAndClear_forappupdatecase(context);
+
+      if (uploadFunctionCalled == true) {
+        await clearAndFetchMasterData(context);
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> clearAndFetchMasterData(BuildContext context) async {
+    cleartable_localmasterschemelisttable();
+    Apiservice.Getmasterapi(context).then((value) {
+      for (int i = 0; i < value.villagelist!.length; i++) {
+        var userid = value.villagelist![i]!.userId;
+
+        var villageId = value.villagelist![i]!.villageId;
+        var stateId = value.villagelist![i]!.stateId;
+        var villageName = value.villagelist![i]!.VillageName;
+
+        databaseHelperJalJeevan
+            ?.insertMastervillagelistdata(Localmasterdatanodal(
+                UserId: userid.toString(),
+                villageId: villageId.toString(),
+                StateId: stateId.toString(),
+                villageName: villageName.toString()))
+            .then((value) {});
+      }
+      databaseHelperJalJeevan!.removeDuplicateEntries();
+
+      for (int i = 0; i < value.villageDetails!.length; i++) {
+        var stateName = "Assam";
+
+        var districtName = value.villageDetails![i]!.districtName;
+        var stateid = value.villageDetails![i]!.stateId;
+        var blockName = value.villageDetails![i]!.blockName;
+        var panchayatName = value.villageDetails![i]!.panchayatName;
+        var stateidnew = value.villageDetails![i]!.stateId;
+        var userId = value.villageDetails![i]!.userId;
+        var villageIddetails = value.villageDetails![i]!.villageId;
+        var villageName = value.villageDetails![i]!.villageName;
+        var totalNoOfScheme = value.villageDetails![i]!.totalNoOfScheme;
+        var totalNoOfWaterSource =
+            value.villageDetails![i]!.totalNoOfWaterSource;
+        var totalWsGeoTagged = value.villageDetails![i]!.totalWsGeoTagged;
+        var pendingWsTotal = value.villageDetails![i]!.pendingWsTotal;
+        var balanceWsTotal = value.villageDetails![i]!.balanceWsTotal;
+        var totalSsGeoTagged = value.villageDetails![i]!.totalSsGeoTagged;
+        var pendingApprovalSsTotal =
+            value.villageDetails![i]!.pendingApprovalSsTotal;
+        var totalIbRequiredGeoTagged =
+            value.villageDetails![i]!.totalIbRequiredGeoTagged;
+        var totalIbGeoTagged = value.villageDetails![i]!.totalIbGeoTagged;
+        var pendingIbTotal = value.villageDetails![i]!.pendingIbTotal;
+        var balanceIbTotal = value.villageDetails![i]!.balanceIbTotal;
+        var totalOaGeoTagged = value.villageDetails![i]!.totalOaGeoTagged;
+        var balanceOaTotal = value.villageDetails![i]!.balanceOaTotal;
+        var totalNoOfSchoolScheme =
+            value.villageDetails![i]!.totalNoOfSchoolScheme;
+        var totalNoOfPwsScheme = value.villageDetails![i]!.totalNoOfPwsScheme;
+
+        databaseHelperJalJeevan
+            ?.insertMastervillagedetails(Localmasterdatamodal_VillageDetails(
+          status: "0",
+          stateName: stateName,
+          districtName: districtName,
+          blockName: blockName,
+          panchayatName: panchayatName,
+          stateId: stateidnew.toString(),
+          userId: userId.toString(),
+          villageId: villageIddetails.toString(),
+          villageName: villageName,
+          totalNoOfScheme: totalNoOfScheme.toString(),
+          totalNoOfWaterSource: totalNoOfWaterSource.toString(),
+          totalWsGeoTagged: totalWsGeoTagged.toString(),
+          pendingWsTotal: pendingWsTotal.toString(),
+          balanceWsTotal: balanceWsTotal.toString(),
+          totalSsGeoTagged: totalSsGeoTagged.toString(),
+          pendingApprovalSsTotal: pendingApprovalSsTotal.toString(),
+          totalIbRequiredGeoTagged: totalIbRequiredGeoTagged.toString(),
+          totalIbGeoTagged: totalIbGeoTagged.toString(),
+          pendingIbTotal: pendingIbTotal.toString(),
+          balanceIbTotal: balanceIbTotal.toString(),
+          totalOaGeoTagged: totalOaGeoTagged.toString(),
+          balanceOaTotal: balanceOaTotal.toString(),
+          totalNoOfSchoolScheme: totalNoOfSchoolScheme.toString(),
+          totalNoOfPwsScheme: totalNoOfPwsScheme.toString(),
+        ));
+      }
+
+      for (int i = 0; i < value.schmelist!.length; i++) {
+        var sourceType = value.schmelist![i]!.source_type;
+        var schemeidnew = value.schmelist![i]!.schemeid;
+        var villageid = value.schmelist![i]!.villageId;
+        var schemenamenew = value.schmelist![i]!.schemename;
+        var schemenacategorynew = value.schmelist![i]!.category;
+        var SourceTypeCategoryId = value.schmelist![i]!.SourceTypeCategoryId;
+        var sourceTypecategory = value.schmelist![i]!.source_typeCategory;
+        databaseHelperJalJeevan
+            ?.insertMasterSchmelist(Localmasterdatamoda_Scheme(
+          source_type: sourceType.toString(),
+          schemeid: schemeidnew.toString(),
+          villageId: villageid.toString(),
+          schemename: schemenamenew.toString(),
+          category: schemenacategorynew.toString(),
+          SourceTypeCategoryId: SourceTypeCategoryId.toString(),
+          source_typeCategory: sourceTypecategory.toString(),
+        ));
+      }
+
+      for (int i = 0; i < value.sourcelist!.length; i++) {
+        var sourceId = value.sourcelist![i]!.sourceId;
+        var SchemeId = value.sourcelist![i]!.schemeId;
+        var stateid = value.sourcelist![i]!.stateid;
+        var Schemename = value.sourcelist![i]!.schemeName;
+        var villageid = value.sourcelist![i]!.villageId;
+        var sourceTypeId = value.sourcelist![i]!.sourceTypeId;
+        var statename = value.sourcelist![i]!.stateName;
+        var sourceTypeCategoryId = value.sourcelist![i]!.sourceTypeCategoryId;
+        var habitationId = value.sourcelist![i]!.habitationId;
+        var villageName = value.sourcelist![i]!.villageName;
+        var existTagWaterSourceId = value.sourcelist![i]!.existTagWaterSourceId;
+        var isApprovedState = value.sourcelist![i]!.isApprovedState;
+        var landmark = value.sourcelist![i]!.landmark;
+        var latitude = value.sourcelist![i]!.latitude;
+        var longitude = value.sourcelist![i]!.longitude;
+        var habitationName = value.sourcelist![i]!.habitationName;
+        var location = value.sourcelist![i]!.location;
+        var sourceTypeCategory = value.sourcelist![i]!.sourceTypeCategory;
+        var sourceType = value.sourcelist![i]!.sourceType;
+        var districtName = value.sourcelist![i]!.districtName;
+        var districtId = value.sourcelist![i]!.districtId;
+        var panchayatNamenew = value.sourcelist![i]!.panchayatName;
+        var blocknamenew = value.sourcelist![i]!.blockName;
+
+        databaseHelperJalJeevan
+            ?.insertMasterSourcedetails(LocalSourcelistdetailsModal(
+          schemeId: SchemeId.toString(),
+          sourceId: sourceId.toString(),
+          villageId: villageid.toString(),
+          schemeName: Schemename,
+          sourceTypeId: sourceTypeId.toString(),
+          sourceTypeCategoryId: sourceTypeCategoryId.toString(),
+          habitationId: habitationId.toString(),
+          existTagWaterSourceId: existTagWaterSourceId.toString(),
+          isApprovedState: isApprovedState.toString(),
+          landmark: landmark,
+          latitude: latitude.toString(),
+          longitude: longitude.toString(),
+          habitationName: habitationName,
+          location: location,
+          sourceTypeCategory: sourceTypeCategory,
+          sourceType: sourceType,
+          stateName: statename,
+          districtName: districtName,
+          blockName: blocknamenew,
+          panchayatName: panchayatNamenew,
+          districtId: districtId.toString(),
+          villageName: villageName,
+          stateId: stateid.toString(),
+        ));
+      }
+
+      for (int i = 0; i < value.habitationlist!.length; i++) {
+        var villafgeid = value.habitationlist![i]!.villageId;
+        var habitationId = value.habitationlist![i]!.habitationId;
+        var habitationName = value.habitationlist![i]!.habitationName;
+
+        databaseHelperJalJeevan?.insertMasterhabitaionlist(
+            LocalHabitaionlistModal(
+                villageId: villafgeid.toString(),
+                HabitationId: habitationId.toString(),
+                HabitationName: habitationName.toString()));
+      }
+      for (int i = 0; i < value.informationBoardList!.length; i++) {
+        databaseHelperJalJeevan?.insertmastersibdetails(
+            LocalmasterInformationBoardItemModal(
+                userId: value.informationBoardList![i]!.userId.toString(),
+                villageId: value.informationBoardList![i]!.villageId.toString(),
+                stateId: value.informationBoardList![i]!.stateId.toString(),
+                schemeId: value.informationBoardList![i]!.schemeId.toString(),
+                districtName: value.informationBoardList![i]!.districtName,
+                blockName: value.informationBoardList![i]!.blockName,
+                panchayatName: value.informationBoardList![i]!.panchayatName,
+                villageName: value.informationBoardList![i]!.villageName,
+                habitationName: value.informationBoardList![i]!.habitationName,
+                latitude: value.informationBoardList![i]!.latitude.toString(),
+                longitude: value.informationBoardList![i]!.longitude.toString(),
+                sourceName: value.informationBoardList![i]!.sourceName,
+                schemeName: value.informationBoardList![i]!.schemeName,
+                message: value.informationBoardList![i]!.message,
+                status: value.informationBoardList![i]!.status.toString()));
+      }
+    });
+  }
+
+  Future<void> uploadLocalDataAndClear_forsib(BuildContext context) async {
+    uploadFunctionCalled = true;
+    successfulUploadCountSIB = 0;
+    try {
+      final List<LocalSIBsavemodal>? localDataList =
+          await databaseHelperJalJeevan?.getallofflineentriessib();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.SIBSavetaggingapi(
+          context,
+          box.read("UserToken").toString(),
+          box.read("userid").toString(),
+          localData.villageId,
+          localData.capturePointTypeId,
+          localData.stateId,
+          localData.schemeId,
+          localData.sourceId,
+          box.read("DivisionId").toString(),
+          localData.habitationId,
+          localData.landmark,
+          localData.latitude,
+          localData.longitude,
+          localData.accuracy,
+          localData.photo,
+        );
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCountSIB++;
+          });
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_sibsaved(localData.schemeId);
+        } else {
+          await databaseHelperJalJeevan?.updateStatusInPendingListsib(
+            localData.villageId,
+            localData.schemeId,
+            'This source is already tagged',
+          );
+
+          Stylefile.showmessageforvalidationfalse(
+            context,
+            "This source is already tagged",
+          );
+        }
+      }
+
+      if (successfulUploadCountSIB > 0) {
+        setState(() {});
+        Stylefile.showmessageforvalidationtrue(
+          context,
+          "$successfulUploadCountSIB records of information board has been uploaded successfully.",
+        );
+
+        setState(() {
+          totalsibboard =
+              (int.parse(totalsibboard) - successfulUploadCountSIB).toString();
+        });
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> uploadLocalDataAndClear_forsib_appupdatecase(
+      BuildContext context) async {
+    uploadFunctionCalled = true;
+    successfulUploadCountSIB = 0;
+    try {
+      final List<LocalSIBsavemodal>? localDataList =
+          await databaseHelperJalJeevan?.getallofflineentriessib();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.SIBSavetaggingapi(
+          context,
+          box.read("UserToken").toString(),
+          box.read("userid").toString(),
+          localData.villageId,
+          localData.capturePointTypeId,
+          localData.stateId,
+          localData.schemeId,
+          localData.sourceId,
+          box.read("DivisionId").toString(),
+          localData.habitationId,
+          localData.landmark,
+          localData.latitude,
+          localData.longitude,
+          localData.accuracy,
+          localData.photo,
+        );
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCountSIB++;
+          });
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_sibsaved(localData.schemeId);
+        } else {
+          await databaseHelperJalJeevan?.removeEntriessibwhere(
+            localData.villageId,
+            localData.schemeId,
+          );
+        }
+      }
+
+      if (successfulUploadCountSIB > 0) {
+        setState(() {});
+        Stylefile.showmessageforvalidationtrue(
+          context,
+          "$successfulUploadCountSIB records of information board has been uploaded successfully.",
+        );
+
+        setState(() {
+          totalsibboard =
+              (int.parse(totalsibboard) - successfulUploadCountSIB).toString();
+        });
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> StoragestructureuploadLocalDataAndClear(
+      BuildContext context) async {
+    successfulUploadCountSS = 0;
+    uploadFunctionCalled = true;
+    try {
+      final List<LocalStoragestructureofflinesavemodal>? localDataList =
+          await databaseHelperJalJeevan?.getallofflineentriesstoragestructure();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.StoragestructureSavetaggingapi(
+          context,
+          /*String token,
+      String UserId,
+      String VillageId,
+      String StateId,
+      String SchemeId,
+      String SourceId,
+      String DivisionId,
+      String HabitationId,
+      String Landmark,
+      String Latitude,
+      String Longitude,
+      String Accuracy,
+      String Photo,
+      String capacityInltr,
+      String storageStructureType,*/
+          box.read("UserToken").toString(),
+          box.read("userid").toString(),
+          localData.villageId,
+          localData.stateId,
+          localData.schemeId,
+          localData.sourceId,
+          box.read("DivisionId").toString(),
+          localData.habitationId,
+          localData.landmark,
+          localData.latitude,
+          localData.longitude,
+          localData.accuracy,
+          localData.photo,
+          /*     localData.Selectstoragecategory,
+          localData.Storagecapacity,*/
+          localData.Storagecapacity,
+          localData.Selectstoragecategory,
+        );
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCountSS++;
+          });
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_sssaved(localData.schemeId);
+        } else {
+          await databaseHelperJalJeevan
+              ?.updateStatusInPendingListstoragestructure(
+            localData.villageId,
+            localData.schemeId,
+            'This source is already tagged',
+          );
+
+          Stylefile.showmessageforvalidationfalse(
+            context,
+            "This source is already tagged",
+          );
+        }
+      }
+
+      if (successfulUploadCountSS > 0) {
+        setState(() {});
+        Stylefile.showmessageforvalidationtrue(
+          context,
+          "$successfulUploadCountSS records of information board has been uploaded successfully.",
+        );
+
+        setState(() {
+          totalstoragestructureofflineentreies =
+              (int.parse(totalstoragestructureofflineentreies) -
+                      successfulUploadCountSS)
+                  .toString();
+        });
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> StoragestructureuploadLocalDataAndClear_forappupdatecase(
+      BuildContext context) async {
+    successfulUploadCountSS = 0;
+    uploadFunctionCalled = true;
+    try {
+      final List<LocalStoragestructureofflinesavemodal>? localDataList =
+          await databaseHelperJalJeevan?.getallofflineentriesstoragestructure();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.StoragestructureSavetaggingapi(
+          context,
+          /*String token,
+      String UserId,
+      String VillageId,
+      String StateId,
+      String SchemeId,
+      String SourceId,
+      String DivisionId,
+      String HabitationId,
+      String Landmark,
+      String Latitude,
+      String Longitude,
+      String Accuracy,
+      String Photo,
+      String capacityInltr,
+      String storageStructureType,*/
+          box.read("UserToken").toString(),
+          box.read("userid").toString(),
+          localData.villageId,
+          localData.stateId,
+          localData.schemeId,
+          localData.sourceId,
+          box.read("DivisionId").toString(),
+          localData.habitationId,
+          localData.landmark,
+          localData.latitude,
+          localData.longitude,
+          localData.accuracy,
+          localData.photo,
+          //
+          /*  localData.Selectstoragecategory,
+          localData.Storagecapacity,*/
+
+          localData.Storagecapacity,
+          localData.Selectstoragecategory,
+        );
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCountSS++;
+          });
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_sssaved(localData.schemeId);
+        } else {
+          setState(() async {
+            await databaseHelperJalJeevan?.removeEntries_ss_where(
+              localData.villageId,
+              localData.schemeId,
+            );
+          });
+        }
+      }
+
+      if (successfulUploadCountSS > 0) {
+        setState(() {});
+        Stylefile.showmessageforvalidationtrue(
+          context,
+          "$successfulUploadCountSS records of information board has been uploaded successfully.",
+        );
+
+        setState(() {
+          totalstoragestructureofflineentreies =
+              (int.parse(totalstoragestructureofflineentreies) -
+                      successfulUploadCountSS)
+                  .toString();
+        });
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> OtherassetsuploadLocalDataAndClear(BuildContext context) async {
+    uploadFunctionCalled = true;
+    successfulUploadCountOT = 0;
+    try {
+      final List<LocalOtherassetsofflinesavemodal>? localDataList =
+          await databaseHelperJalJeevan?.getallofflineentriesotherassets();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.OtherassetSavetaggingapi(
+            context,
+            /*String token,
+      String UserId,
+      String VillageId,
+      String StateId,
+      String SchemeId,
+      String SourceId,
+      String DivisionId,
+      String HabitationId,
+      String Landmark,
+      String Latitude,
+      String Longitude,
+      String Accuracy,
+      String Photo,
+      String assetOtherCategory*/
+            box.read("UserToken").toString(),
+            box.read("userid").toString(),
+            localData.villageId,
+            localData.stateId,
+            localData.schemeId,
+            localData.sourceId,
+            box.read("DivisionId").toString(),
+            localData.habitationId,
+            localData.landmark,
+            localData.latitude,
+            localData.longitude,
+            localData.accuracy,
+            localData.photo,
+            // localData.capturePointTypeId
+            localData.Selectassetsothercategory);
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCountOT++;
+          });
+
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_Ot(localData.schemeId);
+        } else {
+          await databaseHelperJalJeevan?.updateStatusInpendinglistot(
+            localData.villageId,
+            localData.schemeId,
+            'This source is already tagged',
+          );
+
+          Stylefile.showmessageforvalidationfalse(
+            context,
+            "This source is already tagged",
+          );
+        }
+      }
+
+      if (successfulUploadCountOT > 0) {
+        setState(() {});
+        Stylefile.showmessageforvalidationtrue(
+          context,
+          "$successfulUploadCountOT records of other assets has been uploaded successfully.",
+        );
+
+        setState(() {
+          totalotherassetsofflineentreies =
+              (int.parse(totalotherassetsofflineentreies) -
+                      successfulUploadCountOT)
+                  .toString();
+        });
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> OtherassetsuploadLocalDataAndClear_forappupdatecase(
+      BuildContext context) async {
+    uploadFunctionCalled = true;
+    successfulUploadCountOT = 0;
+    try {
+      final List<LocalOtherassetsofflinesavemodal>? localDataList =
+          await databaseHelperJalJeevan?.getallofflineentriesotherassets();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.OtherassetSavetaggingapi(
+            context,
+            /*String token,
+      String UserId,
+      String VillageId,
+      String StateId,
+      String SchemeId,
+      String SourceId,
+      String DivisionId,
+      String HabitationId,
+      String Landmark,
+      String Latitude,
+      String Longitude,
+      String Accuracy,
+      String Photo,
+      String assetOtherCategory*/
+            box.read("UserToken").toString(),
+            box.read("userid").toString(),
+            localData.villageId,
+            localData.stateId,
+            localData.schemeId,
+            localData.sourceId,
+            box.read("DivisionId").toString(),
+            localData.habitationId,
+            localData.landmark,
+            localData.latitude,
+            localData.longitude,
+            localData.accuracy,
+            localData.photo,
+            //  localData.capturePointTypeId
+            localData.Selectassetsothercategory);
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCountOT++;
+          });
+
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_Ot(localData.schemeId);
+        } else {
+          setState(() async {
+            await databaseHelperJalJeevan?.removeEntries_ot_where(
+              localData.villageId,
+              localData.schemeId,
+            );
+          });
+        }
+      }
+
+      if (successfulUploadCountOT > 0) {
+        setState(() {});
+        Stylefile.showmessageforvalidationtrue(
+          context,
+          "$successfulUploadCountOT records of other assets has been uploaded successfully.",
+        );
+        setState(() {
+          totalotherassetsofflineentreies =
+              (int.parse(totalotherassetsofflineentreies) -
+                      successfulUploadCountOT)
+                  .toString();
+        });
+      }
+    } catch (e) {
+      debugPrintStack();
+    }
+  }
+
+  Future<void> uploadLocalDataAndClear(BuildContext context) async {
+    uploadFunctionCalled = true;
+    try {
+      final List<LocalPWSSavedData>? localDataList =
+          await databaseHelperJalJeevan?.getAllLocalPWSSavedData();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.PWSSourceSavetaggingapi(
+            context,
+            box.read("UserToken").toString(),
+            localData.userId,
+            localData.villageId,
+            localData.assetTaggingId,
+            localData.stateId,
+            localData.schemeId,
+            localData.sourceId,
+            localData.divisionId,
+            localData.habitationId,
+            localData.subsourceaddnew,
+            localData.sourceTypeCategoryId.toString(),
+            localData.landmark,
+            localData.latitude,
+            localData.longitude,
+            localData.accuracy,
+            localData.image);
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCount++;
+          });
+
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_pwssavedonserver(localData.schemeId);
+        } else {
+          Stylefile.showmessageforvalidationfalse(
+              context, "This source is alredy tagged.");
+
+          await databaseHelperJalJeevan?.updateStatusInPendingList(
+              localData.villageId,
+              localData.schemeId,
+              'This source is already tagged');
+
+          print("goggo");
+        }
+      }
+
+      if (successfulUploadCount > 0) {
+        Stylefile.showmessageforvalidationtrue(context,
+            "$successfulUploadCount records of pws has been uploaded successfully.");
+        setState(() {
+          totalpwssource =
+              (int.parse(totalpwssource) - successfulUploadCount).toString();
+        });
+      }
+    } catch (e) {
+      if (e is TimeoutException) {
+        Stylefile.showmessageforvalidationfalse(context,
+            "Connection timed out. Please check your internet connection.");
+      }
+    }
+  }
+
+  Future<void> uploadLocalDataAndClear_forappupdatecase(
+      BuildContext context) async {
+    uploadFunctionCalled = true;
+    try {
+      final List<LocalPWSSavedData>? localDataList =
+          await databaseHelperJalJeevan?.getAllLocalPWSSavedData();
+      if (localDataList!.isEmpty) {
+        return;
+      }
+
+      for (final localData in localDataList) {
+        final response = await Apiservice.PWSSourceSavetaggingapi(
+            context,
+            box.read("UserToken").toString(),
+            localData.userId,
+            localData.villageId,
+            localData.assetTaggingId,
+            localData.stateId,
+            localData.schemeId,
+            localData.sourceId,
+            localData.divisionId,
+            localData.habitationId,
+            localData.subsourceaddnew,
+            localData.sourceTypeCategoryId.toString(),
+            localData.landmark,
+            localData.latitude,
+            localData.longitude,
+            localData.accuracy,
+            localData.image);
+
+        if (response["Status"].toString() == "true") {
+          setState(() {
+            successfulUploadCount++;
+          });
+
+          await databaseHelperJalJeevan
+              ?.truncateTableByVillageId_pwssavedonserver(localData.schemeId);
+        } else {
+          await databaseHelperJalJeevan?.removeEntries(
+              localData.villageId.toString(), localData.schemeId.toString());
+        } /*else {
+          Stylefile.showmessageforvalidationfalse(
+              context, "This source is alredy tagged.");
+
+          await databaseHelperJalJeevan?.updateStatusInPendingList(
+              localData.villageId,
+              localData.schemeId,
+              'This source is already tagged');
+        }*/
+      }
+
+      if (successfulUploadCount > 0) {
+        Stylefile.showmessageforvalidationtrue(context,
+            "$successfulUploadCount records of pws has been uploaded successfully.");
+        setState(() {
+          totalpwssource =
+              (int.parse(totalpwssource) - successfulUploadCount).toString();
+        });
+      }
+    } catch (e) {
+      if (e is TimeoutException) {
+        Stylefile.showmessageforvalidationfalse(context,
+            "Connection timed out. Please check your internet connection.");
+      }
+    }
+  }
+
+  void showAlertDialog(BuildContext context) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Appcolor.white,
+          titlePadding: const EdgeInsets.only(top: 0, left: 0, right: 00),
+          buttonPadding: const EdgeInsets.all(10),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(
+              Radius.circular(
+                5.0,
+              ),
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          title: Container(
+            color: Appcolor.red,
+            child: const Padding(
+              padding: EdgeInsets.only(left: 25, top: 10, bottom: 10),
+              child: Text(
+                'Alert! ',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Appcolor.white),
+              ),
+            ),
+          ),
+          content: const SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Padding(
+                  padding: EdgeInsets.only(left: 0, top: 0, bottom: 0),
+                  child: Text(
+                    "The record has been saved successfully.",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Appcolor.black),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            Container(
+              height: 40,
+              width: 100,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(
+                  color: Appcolor.red,
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextButton(
+                  onPressed: () {
+                    Get.to(Dashboard(
+                        stateid: box.read("stateid"),
+                        userid: box.read("userid"),
+                        usertoken: box.read("UserToken")));
+                  },
+                  child: const Text('OK',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Appcolor.black))),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  bool _isButtonDisabled = false;
+  bool _hasButtonBeenClicked = false;
 }

@@ -2,7 +2,6 @@
 //
 //     final villagelistmodal = villagelistmodalFromJson(jsonString);
 
-import 'package:meta/meta.dart';
 import 'dart:convert';
 
 Villagelistmodal villagelistmodalFromJson(String str) => Villagelistmodal.fromJson(json.decode(str));
@@ -50,9 +49,11 @@ class VillagelistData {
     offlineStatus: json["OfflineStatus"],
   );
 
+
   Map<String, dynamic> toJson() => {
     "VillageId": villageId,
     "VillageName": villageName,
     "OfflineStatus": offlineStatus,
   };
+
 }

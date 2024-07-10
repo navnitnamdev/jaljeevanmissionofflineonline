@@ -34,13 +34,6 @@ class SyncronizationData {
   }
 
 
-
- /* Future<List<NotesModel>> getnoteslist() async {
-    var dbClient = await conn.db;
-    final List<Map<String, Object?>> queryResult = await dbClient!.query('jjmtable');
-    return queryResult.map((e) => NotesModel.fromMap(e)).toList();
-  }
-*/
   final  conn = DatabaseHelperJalJeevan.instance;
   Future<List<Villagelistlocaldata>> fatchvillagelist() async {
     var dbClient = await conn.db;

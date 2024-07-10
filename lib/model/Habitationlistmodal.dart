@@ -1,16 +1,6 @@
-class Habitaionlistmodal{
-  String HabitationName="";
-  String HabitationId="";
+class Habitaionlistmodal {
+  String HabitationName = "";
+  String HabitationId = "";
 
-
-  Habitaionlistmodal(this.HabitationName,this.HabitationId  );
-
-
-
-
-
-
-
-
-
+  Habitaionlistmodal(this.HabitationName, this.HabitationId);
 }

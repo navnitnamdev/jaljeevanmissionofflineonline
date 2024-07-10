@@ -22,14 +22,14 @@ GetStorage box = GetStorage();
   void initState() {
     super.initState();
     if(box.read("UserToken").toString() == "null") {
-      Get.off(LoginScreen());
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      Get.off(const LoginScreen());
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text("Please login your token has been expired!")));
     }
   }
   searchURL(){
     setState(() {
-      url = "https://www."+controller.text;
+      url = "https://www.${controller.text}";
       controller.text=url;
     });
   }
@@ -43,7 +43,7 @@ GetStorage box = GetStorage();
         image: DecorationImage(
             image: AssetImage('images/header_bg.png'), fit: BoxFit.cover),
       ),
-      child: Scaffold());
+      child: const Scaffold());
   }
 }
 

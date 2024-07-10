@@ -9,5 +9,7 @@ class Textfile{
   static String entercaptchacorrect="Please Enter Correct Capctha";
   static String oldpasswordrequired="Old password is required";
   static  String passwordrequired="Password is required";
-  static String selecttermsandcondition="Please select terms of services and privacy policy";
+
+   static const  String headingjaljeevan="Jal Jeevan Mission";
+  static const String subheadingjaljeevan="Department of Drinking Water & Sanitaion,\nMinistry of Jal Shankti";
 }
